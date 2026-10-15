@@ -64,7 +64,7 @@
   <li>下方新增「桌下包板」按鈕：可隱藏／顯示ㄇ字與 435 桌下的木板、Logo、LED；按「TRUSS 尺寸」時也會自動拿掉包板。</li>
   <li class="todo">主視覺印刷需要高解析原檔；彤佳冠零件品項待確認。</li>
   </ol>
-  <b>TRUSS 用量</b>（詳細按下方「TRUSS 評估」）<div id="bom"></div>
+  <b>TRUSS 用量</b><div id="bom"></div>
   </div>
 </div>
 <div id="btns">
@@ -86,7 +86,6 @@
   <button id="tskirt" class="on">桌下包板</button>
   <button id="tlimit" class="on">高度限制</button>
   <button id="lreset">標籤復原</button>
-  <button id="trussBtn" style="background:#2f3b4c;color:#fff">TRUSS 評估</button>
   <span id="sel" style="align-self:center;font-size:13px;color:#555">（點一下物件即選取）</span>
 </div>
 <script type="importmap">
@@ -319,7 +318,7 @@ const trussMat=new THREE.MeshStandardMaterial({color:0xc9ccd1,metalness:0.6,roug
 const nodeMat=new THREE.MeshStandardMaterial({color:0x9ea3aa,metalness:0.6,roughness:0.4});
 const nodeGeo=new THREE.BoxGeometry(5,5,5);
 const diagMat=new THREE.LineBasicMaterial({color:0x8a8f96});
-const TRUSS_USED=[]; let TW='', TG='ㄇ';   // TW＝用途、TG＝區塊（ㄇ／435），給「TRUSS 評估」統計用
+const TRUSS_USED=[]; let TW='', TG='ㄇ';   // TW＝用途、TG＝區塊（ㄇ／435），給 TRUSS 用量統計用
 function truss(axis,x,y,z,len,parent=u){
   TRUSS_USED.push({len:Math.round(len),where:TW,axis,grp:TG});
   // 外尺寸 27×27：22×22 四根主管（內縮 2.5）＋各面斜撐＋每 22 cm 一個節點接頭；axis:'x'|'y'|'z'，(x,y,z)=起點那端截面的最小角
@@ -586,8 +585,7 @@ const KV_SRC='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDAwMDAgQ
   kb.position.set(X+W/2,H+(KTOP-H)/2,D-3+0.9); scene.add(kb);
   label(`主視覺 ${KW}×${KH}（高 ${Math.round((KTOP-KH)*10)/10}～${KTOP}）`,X+W/2,KTOP+8,D+2,scene,'lbl d','dim'); }
 // ── 435 牆面展示台（儲藏室正面牆外側，深 60：R2T 深 55 放得下）
-// v37：同ㄇ字新組法，只用ㄇ字扣完剩下的庫存排：每排地面橫料（88×4＋72／69）→ 直柱 6610×5 → 頂部橫料接在直柱中間（75／75／66／75）；前後兩排
-// 剩下的庫存沒有 61 直柱，檯面＝27＋66＋2＝95（原 90）
+// 前後兩排組法
 TG='435';
 const TH4=FT+VL, SH_H=TH4+2, SH_D=60, SH_T=SH_H-TH4, SH_X0=X+5, SH_W=W-10, SH_Z=D;
 box(SH_W,SH_T,SH_D,SH_X0,SH_H-SH_T,SH_Z,0xb8895a);                     // 檯面
@@ -854,8 +852,8 @@ dimLine(V(UX-15,1,FRONT-LA),V(UX-15,1,FRONT),`左臂 ${LA}`,UX-55,8,FRONT-LA/2);
 dimLine(V(UX+UW+15,1,FRONT-RA),V(UX+UW+15,1,FRONT),`右臂 ${RA}`,UX+UW+60,8,FRONT-RA/2);
 dimLine(V(UX+UW+15,1,60),V(UX+UW+15,1,FRONT-RA),`右臂尾端離陳列櫃 ${FRONT-RA-CAB}`,UX+UW+90,8,(60+FRONT-RA)/2);
 
-// ── TRUSS 需求與庫存（v37：ㄇ字／435 分開；庫存依 09-30 實際盤點，型號前兩碼＝長度 cm，00 母／10 公）
-const STOCK={94:['9410',4],88:['8810',40],85:['8511',7],79:['7910／7911',5],75:['7511',16],72:['7211',1],69:['6910',2],66:['6610／6600',27],61:['6110',1],52:['5211',1],44:['4410',5]};
+// TRUSS 用量統計
+const STOCK={94:['9410',0],88:['8810',0],85:['8511',0],79:['7910／7911',0],75:['7511',0],72:['7211',0],69:['6910',0],66:['6610／6600',0],61:['6110',0],52:['5211',0],44:['4410',0]};
 const SLENS=Object.keys(STOCK).map(Number);
 const nearLen=L=>SLENS.reduce((a,b)=>Math.abs(b-L)<Math.abs(a-L)?b:a);
 function tally(grp){const by={};
@@ -864,7 +862,7 @@ function tally(grp){const by={};
   return by;}
 const TBY={'ㄇ':tally('ㄇ'),'435':tally('435')};
 { const line=g=>{const by=TBY[g]; return Object.keys(by).map(Number).sort((a,b)=>b-a).map(n=>`${n}×${by[n].q}`).join('、')+`（共 ${Object.values(by).reduce((s,o)=>s+o.q,0)} 支）`;};
-  document.getElementById('bom').innerHTML=`ㄇ字：${line('ㄇ')}<br>435 展示台：${line('435')}<br>與實際庫存比對請按下方「TRUSS 評估」`;
+  document.getElementById('bom').innerHTML=`ㄇ字：${line('ㄇ')}<br>435 展示台：${line('435')}`;
 }
 { const th='style="text-align:left;border-bottom:2px solid #2f3b4c;padding:4px 8px"', td='style="border-bottom:1px solid #ddd;padding:4px 8px;vertical-align:top"';
   const left={}; for(const n of SLENS) left[n]=STOCK[n][1];
@@ -877,7 +875,7 @@ const TBY={'ㄇ':tally('ㄇ'),'435':tally('435')};
          `<td ${td}>${lack?`<b style="color:#b03030">缺 ${lack}</b>`:'<span style="color:#2f7a3a">夠</span>'}</td><td ${td}>${Object.entries(o.w).map(([w,q])=>w+' ×'+q).join('<br>')}</td></tr>`;}
     h+=`<tr><td ${td}><b>合計</b></td><td ${td}></td><td ${td}><b>${tot}</b></td><td ${td}></td><td ${td}>${short?`<b style="color:#b03030">缺 ${short} 支</b>`:'<span style="color:#2f7a3a">全部夠</span>'}</td><td ${td}>直柱 ${legs}＋橫料 ${tot-legs}</td></tr></table>`;
     return h;};
-  let html=`<div style="color:#555;margin-top:6px">庫存依 09-30 實際盤點；先扣ㄇ字，435 用剩下的。455310×3、455300×3 用途未確認，未列入。型號依長度對應，下單前確認公母（00 母／10 公）。</div>`;
+  let html=`<div style="color:#555;margin-top:6px">先扣ㄇ字，435 用剩下的。455310×3、455300×3 用途未確認，未列入。型號依長度對應，下單前確認公母（00 母／10 公）。</div>`;
   html+=table('ㄇ','① ㄇ字型沖泡區（新組法：地面橫料 → 直柱 6610 → 頂部橫料接在兩支直柱中間）');
   html+=`<ol style="margin:6px 0 0 18px;padding:0">
 <li>檯面 95＝地面橫料 27（22 管＋接頭）＋直柱 66＋木板 2；公頭插進去後實際可能差 1～2 cm。</li>
@@ -893,7 +891,7 @@ const TBY={'ㄇ':tally('ㄇ'),'435':tally('435')};
 <li>每排：地面橫料頭尾相接（88×4＋72／69）→ 直柱 6610×5 → 頂部橫料 75／75／66／75 接在直柱中間。</li>
 <li>前後兩排只在地面和檯面連接，建議展示台再與儲藏室牆面固定。</li></ol>`;
   document.getElementById('trussBody').innerHTML=html;
-  document.getElementById('trussBtn').onclick=()=>{document.getElementById('trussPanel').hidden=false;};
+  const _tb=document.getElementById('trussBtn'); if(_tb)_tb.onclick=()=>{document.getElementById('trussPanel').hidden=false;};
   document.getElementById('trussClose').onclick=()=>{document.getElementById('trussPanel').hidden=true;};
 }
 // 說明框：按住標題列可拖曳，位置記在瀏覽器（讀不到就用預設位置）
@@ -1042,7 +1040,7 @@ addEventListener('resize',()=>{pcam.aspect=innerWidth/innerHeight;pcam.updatePro
 </script>
 <div id="trussPanel" hidden style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:760px;width:calc(100% - 32px);max-height:80vh;overflow:auto;background:#fff;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:18px 22px;font-size:14px;line-height:1.6;z-index:50">
   <button id="trussClose" style="float:right;font-family:inherit;cursor:pointer;padding:4px 10px">關閉</button>
-  <b style="font-size:17px">TRUSS 評估（ㄇ字／435 分開，對照 09-30 實際盤點）</b>
+  <b style="font-size:17px">TRUSS 用量</b>
   <div id="trussBody"></div>
 </div>
 
