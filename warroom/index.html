@@ -238,9 +238,11 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
 .pill-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
 .pill{font-size:10px;border:1px solid var(--frame);border-radius:999px;padding:2px 8px;color:var(--ink-2);}
 
-.outreach-link{display:block;margin-top:10px;padding:8px 10px;border:1px solid var(--frame);border-radius:5px;
-  font-size:12px;color:var(--ink);text-decoration:none;background:linear-gradient(180deg,rgba(23,58,94,.5),rgba(12,22,40,.7));}
-.outreach-link:hover{border-color:var(--s1);}
+.outreach-btn{display:inline-flex;align-items:center;padding:5px 14px;border-radius:999px;
+  background:var(--warn);color:#1a1200;font-size:13px;font-weight:700;text-decoration:none;
+  box-shadow:0 0 0 2px rgba(250,178,25,.25),0 0 12px rgba(250,178,25,.45);}
+.outreach-btn:hover{background:#ffc94d;box-shadow:0 0 0 3px rgba(250,178,25,.35),0 0 16px rgba(250,178,25,.6);}
+.outreach-btn:focus-visible{outline:2px solid #fff;outline-offset:2px;}
 
 /* ---------- bottom nav ---------- */
 .nav{
@@ -421,7 +423,6 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
         <div class="chart" id="cRegion"></div>
         <div class="tview" id="tStates"></div>
         <p class="mini" id="regionNote"></p>
-        <a class="outreach-link" href="../us-outreach/">查看美國名單收集與開發信成效（真實彙總數字）→</a>
       </div>
     </section>
 
@@ -644,6 +645,7 @@ function renderLights(){
   $("#lights").innerHTML =
     `<button class="dept-btn" type="button" data-dept="rd" aria-haspopup="true" aria-expanded="false">研發</button>` +
     `<button class="dept-btn" type="button" data-dept="mkt" aria-haspopup="true" aria-expanded="false">行銷</button>` +
+    `<a class="outreach-btn" href="../us-outreach/">📈 開發信成效 →</a>` +
     `<span class="light"><i class="dot total"></i>納管專案 <b>${list.length}</b></span>` +
     `<span class="light"><i class="dot good"></i>正常 <b>${c("good")}</b></span>` +
     `<span class="light"><i class="dot warn"></i>注意 <b>${c("warn")}</b></span>` +
