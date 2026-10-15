@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>美國開發信成效</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, airmail stripe on top, KPI row → funnel → monthly → waves → data cleaning → benchmark */
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#18263a; --mute:#5d6b7e; --line:#dde2ea;
+  --navy:#1f3a5f; --red:#c2412d; --teal:#2f7f86; --sand:#c9a25a; --soft:#e8edf4;
+  --ok:#2c7a4b; --warn:#a8641a;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1520; --panel:#172131; --ink:#e6ebf2; --mute:#9aa7b8; --line:#2a3647;
+  --navy:#8fb0d8; --red:#ec7a64; --teal:#6cc0c6; --sand:#d9b878; --soft:#1f2b3d; --ok:#6fcf97; --warn:#e3a35a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1520; --panel:#172131; --ink:#e6ebf2; --mute:#9aa7b8; --line:#2a3647;
+  --navy:#8fb0d8; --red:#ec7a64; --teal:#6cc0c6; --sand:#d9b878; --soft:#1f2b3d; --ok:#6fcf97; --warn:#e3a35a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.65}
+.stripe{height:8px;background:repeating-linear-gradient(-45deg,var(--red) 0 14px,var(--bg) 14px 22px,var(--navy) 22px 36px,var(--bg) 36px 44px)}
+.wrap{max-width:980px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
+header .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--mute);text-transform:uppercase}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,4vw,36px);margin:4px 0 8px;text-wrap:balance}
+.lead{font-size:17px;max-width:62ch;margin:0}
+.lead b{color:var(--red)}
+h2{font-family:var(--display);font-size:21px;margin:0 0 4px;text-wrap:balance}
+.note{color:var(--mute);font-size:13px;margin:0 0 14px;max-width:70ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:2px;align-content:start}
+.kpi .k{font-size:13px;color:var(--mute)}
+.kpi .v{font-family:var(--display);font-size:30px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi .v small{font-size:15px;color:var(--mute);font-family:var(--body)}
+.kpi .d{font-size:12px;color:var(--mute)}
+.kpi.hl{border-color:var(--navy);box-shadow:inset 0 3px 0 var(--navy)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+svg text{fill:var(--mute);font-family:var(--body);font-size:12px}
+svg .val{fill:var(--ink);font-family:var(--mono);font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--mute);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--mute);font-size:12px}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:var(--soft)}
+.pill.bad{color:var(--red)} .pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)}
+.clean{display:grid;gap:14px}
+.cleanrow{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr);gap:12px;align-items:center}
+.bar{display:flex;height:26px;border-radius:5px;overflow:hidden;background:var(--soft)}
+.bar span{display:flex;align-items:center;padding:0 8px;font-size:12px;font-family:var(--mono);color:#fff;white-space:nowrap;overflow:hidden}
+.role{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.role div{border-left:3px solid var(--teal);padding:4px 0 4px 12px}
+.role b{display:block;font-weight:500}
+.src{font-size:12px;color:var(--mute)} .src a{color:var(--navy)}
+.tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;box-shadow:0 4px 14px #0002;display:none}
+</style>
+</head>
+<body>
+
+<div class="stripe"></div>
+<div class="wrap">
+<header>
+  <div class="eyebrow">美國流程 A + B · 2026-06-24 → 2026-10-15 · 資料庫快照 2026-10-15</div>
+  <h1>美國開發信成效</h1>
+  <p class="lead">名單端收集了 <b>8,815</b> 筆美國飲品業者，涵蓋 19 州、8 大目標產業。開發信端在四個月內，系統對 <b>2,062</b> 個美國業者信箱寄出 <b>4,784</b> 封開發信，送達率 <b>94.1%</b>，扣掉機器開信後約 <b>22%</b> 有真人打開，並把 <b>147</b> 家帶進業務跟進看板。弱點在回信：真人回信約 4 家，遠低於業界水準。</p>
+</header>
+
+<section class="card" id="collect">
+  <h2>成果一：美國名單收集（流程 A）</h2>
+  <p class="note">從 Google 地圖等公開來源爬取美國飲品相關業者，分級後存成可開發名單。6 月建立主體，8–9 月再擴充 1,765 筆。</p>
+  <div class="kpis" style="margin-bottom:18px">
+    <div class="kpi hl"><span class="k">收集名單</span><span class="v">8,815 <small>筆</small></span><span class="d">涵蓋 19 州、8 大目標產業</span></div>
+    <div class="kpi"><span class="k">VIP 重點客戶</span><span class="v">3,927 <small>筆</small></span><span class="d">佔 44.5%</span></div>
+    <div class="kpi"><span class="k">有 Email</span><span class="v">3,345 <small>筆</small></span><span class="d">覆蓋率 37.9%</span></div>
+    <div class="kpi"><span class="k">有電話 / 網站</span><span class="v">4,320 <small>/ 5,854</small></span><span class="d">可轉電話或社群開發</span></div>
+  </div>
+  <div class="grid2">
+    <div style="min-width:0"><h3 style="font-size:15px;font-weight:500;margin:0 0 6px">各產業名單數</h3><div id="industryChart"></div>
+      <div class="legend"><span><i style="background:var(--navy)"></i>有 Email</span><span><i style="background:var(--soft);outline:1px solid var(--line)"></i>無 Email</span></div></div>
+    <div style="min-width:0"><h3 style="font-size:15px;font-weight:500;margin:0 0 6px">累積名單成長</h3><div id="growthChart"></div>
+      <p class="note" style="margin-top:6px">另有 122 筆未記錄爬取日期，未列入此圖。</p></div>
+  </div>
+</section>
+
+<h2 style="margin-bottom:-14px">成果二：開發信觸及（流程 B）</h2>
+<section class="kpis" aria-label="行銷成效指標">
+  <div class="kpi hl"><span class="k">觸及信箱數</span><span class="v">2,062 <small>個</small></span><span class="d">對應 2,245 筆名單</span></div>
+  <div class="kpi"><span class="k">寄出總封數</span><span class="v">4,784 <small>封</small></span><span class="d">四波序列合計</span></div>
+  <div class="kpi"><span class="k">送達率</span><span class="v">94.1%</span><span class="d">退信 / 無效 / 封鎖 133 筆</span></div>
+  <div class="kpi"><span class="k">真人開信率（第一封）</span><span class="v">22.2%</span><span class="d">499 / 2,245，已扣機器開信</span></div>
+  <div class="kpi hl"><span class="k">交付業務跟進</span><span class="v">147 <small>家</small></span><span class="d">進入跟進看板的名單</span></div>
+</section>
+
+<section class="card" id="funnel">
+  <h2>名單到跟進的漏斗</h2>
+  <p class="note">每一層占上一層的比例標在右側。流程 A 沒撈到 Email 的店家依設計不進寄信系統；最大落差在「有 Email」這一層，6 成名單找不到可寄信箱。</p>
+  <div id="funnelChart"></div>
+</section>
+
+<div class="grid2">
+<section class="card" id="monthly">
+  <h2>每月寄出封數</h2>
+  <p class="note">9 月起四波同時運作；10 月只統計到 15 日。</p>
+  <div id="monthChart"></div>
+  <div class="legend" id="monthLegend"></div>
+</section>
+<section class="card" id="region">
+  <h2>觸及地區</h2>
+  <p class="note">依名單分區（第一封已寄）。西岸占近一半。</p>
+  <div id="regionChart"></div>
+</section>
+</div>
+
+<section class="card" id="waves">
+  <h2>四波序列表現</h2>
+  <p class="note">真人開信 = 寄出 2 分鐘後才開；真人點擊 = 寄出 5 分鐘後才點。比這更快的幾乎都是收件端的安全掃描器。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>波次</th><th>寄出</th><th>真人開信</th><th>開信率</th><th>真人點擊</th><th>掃描器點擊</th></tr></thead>
+    <tbody id="waveBody"></tbody>
+  </table></div>
+</section>
+
+<section class="card" id="clean">
+  <h2>去掉水分後的真實互動</h2>
+  <p class="note">系統原始數字會灌水。下面是原始紀錄拆開後的結果，建議對內報告用右邊的真人數字。</p>
+  <div class="clean" id="cleanBars"></div>
+  <div class="legend">
+    <span><i style="background:var(--teal)"></i>真人</span>
+    <span><i style="background:var(--sand)"></i>無法判定</span>
+    <span><i style="background:var(--mute)"></i>機器 / 自動回覆</span>
+  </div>
+</section>
+
+<section class="card" id="bench">
+  <h2>和業界基準比較</h2>
+  <p class="note">業界數字取自 2026 年 B2B 冷郵件研究；他們的開信率多含 Apple 隱私保護造成的自動開信，所以我們的去水分開信率偏低是正常的。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>指標</th><th>我們</th><th>業界基準</th><th>判讀</th></tr></thead>
+    <tbody>
+      <tr><td>開信率</td><td>22.2%（去水分）</td><td>27–44%（未去水分）</td><td><span class="pill ok">相當</span></td></tr>
+      <tr><td>回信率</td><td>0.2–0.3%</td><td>中位數 2.1%，平均 3.4%</td><td><span class="pill bad">明顯偏低</span></td></tr>
+      <tr><td>退訂（佔觸及）</td><td>5.8%（130 家）</td><td>無可靠基準</td><td><span class="pill warn">偏高，需留意</span></td></tr>
+      <tr><td>送達失敗</td><td>5.9%</td><td>無可靠基準</td><td><span class="pill warn">可再降</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="role">
+  <h2>以行銷企劃職責來看</h2>
+  <p class="note">不算訂單，只看行銷端交出的成果。</p>
+  <div class="role">
+    <div><b>名單建立</b>爬取收集 8,815 筆，其中 7,469 筆分級進入寄信系統（VIP 3,863 / 一般 3,606），2,954 筆有 Email。</div>
+    <div><b>自動化觸及</b>四波序列、核准閘門與節流全部上線，四個月寄出 4,784 封，人力只需審核。</div>
+    <div><b>送達品質</b>94.1% 送達；132 家退訂已進永不寄信名單，保護寄信網域。</div>
+    <div><b>商機交付</b>147 家進入業務跟進看板；真人回信約 4 家，是下一階段要改善的重點。</div>
+  </div>
+</section>
+
+<p class="src">資料來源：美國名單收集系統（流程 A）與開發信系統（流程 B）2026-10-15 統計快照，僅含彙總數字，不含任何名單資料。回信分類依「回信距寄出時間」判定：2 分鐘內視為自動回覆；另有 2 封無法對到寄出時間。業界基準：<a href="https://instantly.ai/blog/email-sequence-benchmarks-2026-whats-a-good-open-rate-reply-rate-and-cost-per-meeting/" target="_blank" rel="noopener">Instantly 2026</a>、<a href="https://visionary-marketing.co.uk/blog/b2b-cold-email-statistics-2026" target="_blank" rel="noopener">Visionary Marketing 2026</a>。</p>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const D={
+  funnel:[["名單收集（流程 A）",8815],["進入寄信系統",7469],["有 Email",2954],["已觸及（第一封）",2245],["真人開信",499],["交付業務跟進",147]],
+  months:[["6 月",[87,0,0,0]],["7 月",[730,207,0,0]],["8 月",[452,482,462,0]],["9 月",[441,270,253,191]],["10 月*",[535,157,149,368]]],
+  waves:[["第一封",2245,499,17,225],["第二封",1116,229,2,72],["第三封",864,177,2,11],["第四封",559,107,1,3]],
+  industry:[["飲品原料行",1511,468],["飲品設備維修",1229,517],["茶葉貿易商",1184,435],["手搖飲連鎖",964,311],["咖啡連鎖",890,393],["茶葉批發",878,328],["茶館連鎖",806,293],["餐飲設備經銷",691,320]],
+  growth:[["6 月",6928],["8 月",978],["9 月",787]],
+  region:[["West 西部",1091],["East 東部",606],["Central 中部",548]],
+  clean:[["點擊（第一封）",[[17,"teal"],[0,"sand"],[225,"mute"]],"242 次紀錄 → 真人 17"],
+         ["回信",[[4,"teal"],[2,"sand"],[6,"mute"]],"12 封 → 真人 4（其中 2 家後來退訂）"]]
+};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue('--'+v).trim();
+const fmt=n=>n.toLocaleString('en-US');
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+const tip=document.getElementById('tip');
+const showTip=(e,h)=>{tip.innerHTML=h;tip.style.display='block';const x=Math.min(e.clientX+12,innerWidth-tip.offsetWidth-8);tip.style.left=x+'px';tip.style.top=(e.clientY+12)+'px'};
+const hideTip=()=>tip.style.display='none';
+
+function funnel(){
+  const box=document.getElementById('funnelChart');box.innerHTML='';
+  const W=box.clientWidth||600, rowH=38, labW=Math.min(150,W*.32), rightW=110, H=D.funnel.length*rowH;
+  const svg=el('svg',{width:'100%',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'名單漏斗'},box);
+  const max=D.funnel[0][1], bw=W-labW-rightW;
+  D.funnel.forEach(([k,v],i)=>{
+    const y=i*rowH+6, w=Math.max(3,bw*v/max);
+    el('text',{x:0,y:y+17},svg).textContent=k;
+    const r=el('rect',{x:labW,y,width:w,height:22,rx:4,fill:i===D.funnel.length-1?css('red'):css('navy'),opacity:i===D.funnel.length-1?1:.85-i*.1},svg);
+    r.addEventListener('mousemove',e=>showTip(e,`${k}<br><b>${fmt(v)}</b>`));r.addEventListener('mouseleave',hideTip);
+    el('text',{x:labW+w+6,y:y+16,class:'val'},svg).textContent=fmt(v);
+    if(i>0){const t=el('text',{x:W,y:y+16,'text-anchor':'end'},svg);t.textContent=(v/D.funnel[i-1][1]*100).toFixed(1)+'% 承接'}
+  });
+}
+
+function months(){
+  const box=document.getElementById('monthChart');box.innerHTML='';
+  const W=box.clientWidth||420,H=230,m={t:16,r:8,b:26,l:44};
+  const svg=el('svg',{width:'100%',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'每月寄出封數'},box);
+  const cols=[css('navy'),css('teal'),css('sand'),css('red')];
+  const tot=D.months.map(d=>d[1].reduce((a,b)=>a+b,0)), max=1400;
+  const iw=W-m.l-m.r, ih=H-m.t-m.b, bw=Math.min(46,iw/D.months.length*.6);
+  for(let g=0;g<=max;g+=350){const y=m.t+ih-ih*g/max;el('line',{x1:m.l,x2:W-m.r,y1:y,y2:y,stroke:css('line')},svg);el('text',{x:m.l-6,y:y+4,'text-anchor':'end'},svg).textContent=fmt(g)}
+  D.months.forEach(([k,vals],i)=>{
+    const cx=m.l+iw*(i+.5)/D.months.length; let acc=0;
+    vals.forEach((v,j)=>{if(!v)return;const h=ih*v/max,y=m.t+ih-ih*(acc+v)/max;
+      const r=el('rect',{x:cx-bw/2,y,width:bw,height:h,fill:cols[j]},svg);
+      r.addEventListener('mousemove',e=>showTip(e,`${k} · 第${'一二三四'[j]}封<br><b>${fmt(v)}</b> 封`));r.addEventListener('mouseleave',hideTip);acc+=v});
+    el('text',{x:cx,y:m.t+ih-ih*tot[i]/max-5,'text-anchor':'middle',class:'val'},svg).textContent=fmt(tot[i]);
+    el('text',{x:cx,y:H-8,'text-anchor':'middle'},svg).textContent=k;
+  });
+  document.getElementById('monthLegend').innerHTML=['第一封','第二封','第三封','第四封'].map((n,j)=>`<span><i style="background:${cols[j]}"></i>${n}</span>`).join('');
+}
+
+function region(){
+  const box=document.getElementById('regionChart');box.innerHTML='';
+  const W=box.clientWidth||420,rowH=44,H=D.region.length*rowH,labW=100,max=D.region[0][1],tot=D.region.reduce((a,b)=>a+b[1],0);
+  const svg=el('svg',{width:'100%',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'觸及地區'},box);
+  D.region.forEach(([k,v],i)=>{const y=i*rowH+8,w=(W-labW-90)*v/max;
+    el('text',{x:0,y:y+17},svg).textContent=k;
+    el('rect',{x:labW,y,width:w,height:24,rx:4,fill:i===0?css('teal'):css('mute'),opacity:i===0?1:.55},svg);
+    el('text',{x:labW+w+6,y:y+17,class:'val'},svg).textContent=`${fmt(v)}（${(v/tot*100).toFixed(0)}%）`});
+}
+
+function waves(){
+  document.getElementById('waveBody').innerHTML=D.waves.map(([k,s,o,hc,bc])=>
+    `<tr><td>${k}</td><td>${fmt(s)}</td><td>${fmt(o)}</td><td>${(o/s*100).toFixed(1)}%</td><td>${hc}</td><td style="color:var(--mute)">${bc}</td></tr>`).join('')+
+    `<tr><td><b>合計</b></td><td><b>4,784</b></td><td><b>1,012</b></td><td><b>21.2%</b></td><td><b>22</b></td><td style="color:var(--mute)">311</td></tr>`;
+}
+
+function clean(){
+  document.getElementById('cleanBars').innerHTML=D.clean.map(([k,parts,cap])=>{
+    const t=parts.reduce((a,b)=>a+b[0],0);
+    return `<div class="cleanrow"><div><b style="font-weight:500">${k}</b><div style="font-size:12px;color:var(--mute)">${cap}</div></div>
+      <div class="bar">${parts.filter(p=>p[0]).map(([v,c])=>`<span style="width:${v/t*100}%;background:var(--${c})">${v}</span>`).join('')}</div></div>`}).join('');
+}
+
+function industry(){
+  const box=document.getElementById('industryChart');box.innerHTML='';
+  const W=box.clientWidth||420,rowH=30,H=D.industry.length*rowH,labW=96,max=D.industry[0][1],bw=W-labW-70;
+  const svg=el('svg',{width:'100%',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'各產業名單數'},box);
+  D.industry.forEach(([k,t,e],i)=>{const y=i*rowH+5,w=bw*t/max,we=bw*e/max;
+    el('text',{x:0,y:y+14},svg).textContent=k;
+    el('rect',{x:labW,y,width:w,height:18,rx:3,fill:css('soft'),stroke:css('line')},svg);
+    const r=el('rect',{x:labW,y,width:we,height:18,rx:3,fill:css('navy')},svg);
+    r.addEventListener('mousemove',ev=>showTip(ev,`${k}<br>共 <b>${fmt(t)}</b> 筆，有 Email ${fmt(e)}（${(e/t*100).toFixed(0)}%）`));r.addEventListener('mouseleave',hideTip);
+    el('text',{x:labW+w+6,y:y+14,class:'val'},svg).textContent=fmt(t)});
+}
+function growth(){
+  const box=document.getElementById('growthChart');box.innerHTML='';
+  const W=box.clientWidth||420,H=220,m={t:22,r:12,b:26,l:46},iw=W-m.l-m.r,ih=H-m.t-m.b,max=9000;
+  const svg=el('svg',{width:'100%',viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'累積名單成長'},box);
+  for(let g=0;g<=max;g+=3000){const y=m.t+ih-ih*g/max;el('line',{x1:m.l,x2:W-m.r,y1:y,y2:y,stroke:css('line')},svg);el('text',{x:m.l-6,y:y+4,'text-anchor':'end'},svg).textContent=fmt(g)}
+  let acc=0;const bw=Math.min(56,iw/D.growth.length*.55);
+  D.growth.forEach(([k,v],i)=>{const cx=m.l+iw*(i+.5)/D.growth.length,y0=m.t+ih-ih*acc/max;acc+=v;const y1=m.t+ih-ih*acc/max;
+    if(i>0)el('rect',{x:cx-bw/2,y:y0,width:bw,height:m.t+ih-y0,fill:css('mute'),opacity:.35,rx:3},svg);
+    const r=el('rect',{x:cx-bw/2,y:y1,width:bw,height:y0-y1,fill:css('teal'),rx:3},svg);
+    r.addEventListener('mousemove',ev=>showTip(ev,`${k}<br>新增 <b>${fmt(v)}</b>，累積 ${fmt(acc)}`));r.addEventListener('mouseleave',hideTip);
+    el('text',{x:cx,y:y1-6,'text-anchor':'middle',class:'val'},svg).textContent=(i?'+':'')+fmt(v);
+    el('text',{x:cx,y:H-8,'text-anchor':'middle'},svg).textContent=k});
+}
+function draw(){industry();growth();funnel();months();region()}
+waves();clean();draw();
+let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(draw,120)});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>
+
+</body>
+</html>
