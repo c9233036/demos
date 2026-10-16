@@ -7,24 +7,25 @@
 <title>數位轉型戰情中心範本</title>
 <style>
 :root{
-  --plane:#050b16;
-  --surface:#0c1628;
-  --surface-2:#0f1e36;
-  --frame:#173a5e;
-  --frame-2:#1e4a6b;
-  --grid:#172b49;
-  --ink:#eaf2ff;
-  --ink-2:#9fb6d4;
-  --muted:#6e87a8;
-  --s1:#3987e5;
+  --plane:#eef3f9;
+  --surface:#ffffff;
+  --surface-2:#f4f7fb;
+  --frame:#c9d6e6;
+  --frame-2:#a9bdd6;
+  --grid:#e1e8f1;
+  --ink:#10213a;
+  --ink-2:#3d5373;
+  --muted:#667b97;
+  --s1:#2a72d0;
   --s2:#d95926;
-  --s3:#199e70;
-  --good:#0ca30c;
+  --s3:#16875f;
+  --good:#0a8a0a;
   --warn:#fab219;
+  --warn-ink:#9a6500;   /* 黃色當文字用：白底上要夠深才看得清楚 */
   --serious:#ec835a;
-  --crit:#d03b3b;
-  --plan:#9085e9;
-  color-scheme:dark;
+  --crit:#c93434;
+  --plan:#6f62d8;
+  color-scheme:light;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
@@ -36,8 +37,8 @@ body{
   line-height:1.5;
   min-height:100vh;
   background-image:
-    radial-gradient(1200px 600px at 50% -10%, rgba(57,135,229,.18), transparent 60%),
-    linear-gradient(180deg,#050b16 0%,#060e1c 60%,#050b16 100%);
+    radial-gradient(1200px 600px at 50% -10%, rgba(42,114,208,.10), transparent 60%),
+    linear-gradient(180deg,#f3f7fc 0%,#eef3f9 60%,#e9eff7 100%);
 }
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 
@@ -60,7 +61,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 .title{text-align:center;}
 .title h1{
   margin:0;font-size:24px;font-weight:700;letter-spacing:.16em;
-  background:linear-gradient(180deg,#eaf2ff,#6fa8e6);
+  background:linear-gradient(180deg,#10213a,#2a72d0);
   -webkit-background-clip:text;background-clip:text;color:transparent;
 }
 .title p{margin:2px 0 0;font-size:10px;letter-spacing:.3em;color:var(--muted);text-transform:uppercase;}
@@ -92,9 +93,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 .dept-menu[hidden]{display:none;}
 .dept-menu{
   position:fixed;z-index:60;min-width:180px;max-width:240px;
-  background:linear-gradient(180deg,#10203a,#0b1628);
+  background:var(--surface);
   border:1px solid var(--frame-2);border-radius:8px;padding:6px;
-  box-shadow:0 10px 30px rgba(0,0,0,.5);
+  box-shadow:0 10px 30px rgba(16,33,58,.16);
 }
 .dept-menu .dm-item{
   display:block;width:100%;text-align:left;padding:7px 10px;border-radius:5px;
@@ -115,9 +116,10 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 
 /* ---------- panel ---------- */
 .panel{
-  background:linear-gradient(180deg,rgba(15,30,54,.92),rgba(12,22,40,.92));
+  background:linear-gradient(180deg,#ffffff,#fafcfe);
   border:1px solid var(--frame);
   border-radius:6px;
+  box-shadow:0 1px 3px rgba(16,33,58,.06);
   position:relative;
   padding:10px 12px 12px;
 }
@@ -192,7 +194,7 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
 #globe{display:block;width:100%;height:auto;}
 .globe-tag{
   position:absolute;font-size:10px;color:var(--ink-2);letter-spacing:.1em;
-  background:rgba(5,11,22,.6);border:1px solid var(--frame);border-radius:3px;padding:2px 7px;
+  background:rgba(255,255,255,.85);border:1px solid var(--frame);border-radius:3px;padding:2px 7px;
 }
 .globe-tag.tl{top:10px;left:10px;}
 .globe-tag.tr{top:10px;right:10px;}
@@ -219,7 +221,7 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
   border:1px solid currentColor;letter-spacing:.06em;
 }
 .sev.high{color:var(--crit);}
-.sev.mid{color:var(--warn);}
+.sev.mid{color:var(--warn-ink);}
 .sev.low{color:var(--ink-2);}
 .alerts .txt{font-size:12px;color:var(--ink-2);}
 .alerts .txt b{color:var(--ink);font-weight:600;}
@@ -242,14 +244,14 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
   background:var(--warn);color:#1a1200;font-size:13px;font-weight:700;text-decoration:none;
   box-shadow:0 0 0 2px rgba(250,178,25,.25),0 0 12px rgba(250,178,25,.45);}
 .outreach-btn:hover{background:#ffc94d;box-shadow:0 0 0 3px rgba(250,178,25,.35),0 0 16px rgba(250,178,25,.6);}
-.outreach-btn:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+.outreach-btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
 
 /* ---------- bottom nav ---------- */
 .nav{
   display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px;
 }
 .nav button{
-  border:1px solid var(--frame);border-radius:5px;background:linear-gradient(180deg,rgba(23,58,94,.5),rgba(12,22,40,.7));
+  border:1px solid var(--frame);border-radius:5px;background:linear-gradient(180deg,#ffffff,#f3f6fb);
   padding:8px 6px;text-align:left;position:relative;
 }
 .nav button:hover{border-color:var(--s1);}
@@ -261,12 +263,13 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
 /* ---------- modal ---------- */
 .modal[hidden]{display:none;}
 .modal{
-  position:fixed;inset:0;background:rgba(3,7,14,.78);z-index:50;
+  position:fixed;inset:0;background:rgba(16,33,58,.45);z-index:50;
   display:flex;align-items:center;justify-content:center;padding:20px;
 }
 .sheet{
-  background:linear-gradient(180deg,#10203a,#0b1628);
+  background:var(--surface);
   border:1px solid var(--frame-2);border-radius:8px;
+  box-shadow:0 20px 50px rgba(16,33,58,.25);
   width:min(720px,100%);max-height:86vh;overflow:auto;padding:18px 20px 20px;
 }
 .sheet h3{margin:0 0 2px;font-size:18px;}
@@ -279,16 +282,16 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
 .close:hover{color:var(--ink);}
 .badge{font-size:11px;border:1px solid currentColor;border-radius:3px;padding:1px 7px;margin-left:8px;vertical-align:middle;}
 .b-good{color:var(--good);}
-.b-warn{color:var(--warn);}
+.b-warn{color:var(--warn-ink);}
 .b-plan{color:var(--plan);}
 .b-done{color:var(--s3);}
 
 /* ---------- tooltip ---------- */
 #tip{
   position:fixed;z-index:80;pointer-events:none;opacity:0;transition:opacity .12s;
-  background:#0a1626;border:1px solid var(--frame-2);border-radius:4px;
+  background:var(--surface);border:1px solid var(--frame-2);border-radius:4px;
   padding:5px 9px;font-size:11px;color:var(--ink);white-space:nowrap;
-  box-shadow:0 6px 18px rgba(0,0,0,.5);
+  box-shadow:0 6px 18px rgba(16,33,58,.18);
 }
 #tip.on{opacity:1;}
 
@@ -332,8 +335,8 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
 }
 
 
-.demo-tag{display:inline-block;margin-left:8px;padding:1px 8px;border:1px solid var(--warn);border-radius:999px;
-  color:var(--warn);font-size:11px;vertical-align:middle;}
+.demo-tag{display:inline-block;margin-left:8px;padding:1px 8px;border:1px solid var(--warn-ink);border-radius:999px;
+  color:var(--warn-ink);font-size:11px;vertical-align:middle;}
 .flow{list-style:none;margin:0;padding:0;counter-reset:f;}
 .flow li{counter-increment:f;display:grid;grid-template-columns:22px 78px 1fr;gap:8px;align-items:start;
   padding:6px 0;border-bottom:1px solid var(--grid);font-size:12px;color:var(--ink-2);}
@@ -527,11 +530,11 @@ tr.rowlink:focus{outline:1px solid var(--s1);}
    see meta.cloud_data_note in the fetched payload) ================= */
 
 const STATUS = {
-  good : {label:"正常",   color:"var(--good)",  hex:"#0ca30c", cls:"b-good"},
+  good : {label:"正常",   color:"var(--good)",  hex:"#0a8a0a", cls:"b-good"},
   warn : {label:"注意",   color:"var(--warn)",  hex:"#fab219", cls:"b-warn"},
-  done : {label:"已交付", color:"var(--s3)",    hex:"#199e70", cls:"b-done"},
-  plan : {label:"規劃中", color:"var(--plan)",  hex:"#9085e9", cls:"b-plan"},
-  down : {label:"離線",   color:"var(--crit)",  hex:"#d03b3b", cls:"b-warn"}
+  done : {label:"已交付", color:"var(--s3)",    hex:"#16875f", cls:"b-done"},
+  plan : {label:"規劃中", color:"var(--plan)",  hex:"#6f62d8", cls:"b-plan"},
+  down : {label:"離線",   color:"var(--crit)",  hex:"#c93434", cls:"b-warn"}
 };
 
 let MODULES, SHORT, KPIS, VOLUME, KLOCAL, CLOUD_US, US, US_SENT, US_OUTLINE,
@@ -753,7 +756,7 @@ function renderRight(){
 
   $("#cGeo").innerHTML = hBarChart(GEO.map(g => ({
     label: g.label, value: g.value, display: g.value + " 題",
-    color: g.highlight ? "var(--s1)" : "#42536b",
+    color: g.highlight ? "var(--s1)" : "#b6c3d5",
     tip: g.label + "：被提及 " + g.value + " 題（共 100 題）"
   })), {labelW:104, valW:44, aria:"AI 問答提及題數"});
   $("#tGeo").innerHTML = dataTable(["品牌","提及題數","占 100 題"],
@@ -975,15 +978,15 @@ function initMap(){
   /* ---------- 靜態底圖：只在版面變動時重畫 ---------- */
   function buildBase(){
     b.clearRect(0,0,W,H);
-    b.fillStyle = "#081222"; b.fillRect(0,0,W,H);
+    b.fillStyle = "#f6f9fd"; b.fillRect(0,0,W,H);
     const g = b.createRadialGradient(CX, CY-40*k, 40*k, CX, CY-40*k, R*0.95);
-    g.addColorStop(0, "rgba(57,135,229,.13)");
-    g.addColorStop(0.6, "rgba(57,135,229,.05)");
-    g.addColorStop(1, "rgba(5,11,22,0)");
+    g.addColorStop(0, "rgba(42,114,208,.10)");
+    g.addColorStop(0.6, "rgba(42,114,208,.04)");
+    g.addColorStop(1, "rgba(246,249,253,0)");
     b.fillStyle = g; b.fillRect(0,0,W,H);
 
     const step = narrow ? 2.6 : 1.6, d = narrow ? 1.3 : 1.6;
-    b.fillStyle = "rgba(125,178,236,.16)";
+    b.fillStyle = "rgba(42,114,208,.20)";
     for (let lat = 8; lat <= 74; lat += step){
       for (let lon = -172; lon <= -48; lon += step){
         const q = proj(lat, lon);
@@ -992,7 +995,7 @@ function initMap(){
       }
     }
 
-    b.strokeStyle = "rgba(57,135,229,.16)"; b.lineWidth = 1;
+    b.strokeStyle = "rgba(42,114,208,.14)"; b.lineWidth = 1;
     const gline = (fixed, isLat) => {
       b.beginPath();
       let started = false;
@@ -1013,8 +1016,8 @@ function initMap(){
       if (i === 0) b.moveTo(q[0], q[1]); else b.lineTo(q[0], q[1]);
     });
     b.closePath();
-    b.fillStyle = "rgba(57,135,229,.10)"; b.fill();
-    b.strokeStyle = "rgba(125,178,236,.55)"; b.lineWidth = narrow ? 1 : 1.4; b.stroke();
+    b.fillStyle = "rgba(42,114,208,.08)"; b.fill();
+    b.strokeStyle = "rgba(42,114,208,.55)"; b.lineWidth = narrow ? 1 : 1.4; b.stroke();
   }
 
   /* ---------- 標記座標與命中區 ---------- */
@@ -1039,7 +1042,7 @@ function initMap(){
   function drawLabels(){
     if (narrow) return;                             // 手機寬度標不下，改看下方排行表
     ctx.font = '600 ' + (15*k).toFixed(1) + 'px system-ui, "Microsoft JhengHei", sans-serif';
-    ctx.fillStyle = "rgba(234,242,255,.94)";
+    ctx.fillStyle = "rgba(16,33,58,.92)";
     marks.forEach(m => {
       const s = m.s;
       if (!ON_MAP[s.st] && s.st !== "NY") return;
@@ -1056,16 +1059,16 @@ function initMap(){
   function drawCluster(){
     if (narrow || !cl.length) return;
     const anchor = proj(41.6, -73.5);
-    ctx.strokeStyle = "rgba(125,178,236,.35)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(42,114,208,.35)"; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(BX, BY + BH/2); ctx.lineTo(anchor[0] + 18*k, anchor[1] - 6*k);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(8,18,34,.88)";
-    ctx.strokeStyle = "rgba(30,74,107,.9)"; ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(255,255,255,.94)";
+    ctx.strokeStyle = "rgba(169,189,214,.9)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.rect(BX, BY, BW, BH); ctx.fill(); ctx.stroke();
 
-    ctx.fillStyle = "rgba(159,182,212,.9)";
+    ctx.fillStyle = "rgba(61,83,115,.95)";
     ctx.font = '600 ' + (13*k).toFixed(1) + 'px system-ui, "Microsoft JhengHei", sans-serif';
     ctx.fillText("東北部／華府（放大）", BX + 12*k, BY + 19*k);
 
@@ -1073,7 +1076,7 @@ function initMap(){
       const y = BY + (40 + i*21)*k;
       ctx.fillStyle = REG[s.rg] || "#3987e5";
       ctx.beginPath(); ctx.arc(BX + 17*k, y - 4*k, 4*k, 0, PI2); ctx.fill();
-      ctx.fillStyle = "rgba(234,242,255,.92)";
+      ctx.fillStyle = "rgba(16,33,58,.90)";
       ctx.font = '500 ' + (14*k).toFixed(1) + 'px system-ui, "Microsoft JhengHei", sans-serif';
       ctx.fillText(s.st, BX + 30*k, y);
       ctx.textAlign = "right";
@@ -1104,7 +1107,7 @@ function initMap(){
       ctx.globalAlpha = 0.30;
       ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, PI2); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.lineWidth = 4*k; ctx.strokeStyle = "#081222";   // 底色分隔環
+      ctx.lineWidth = 4*k; ctx.strokeStyle = "#f6f9fd";   // 底色分隔環
       ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, PI2); ctx.stroke();
       ctx.lineWidth = 2; ctx.strokeStyle = m.col;
       ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, PI2); ctx.stroke();
