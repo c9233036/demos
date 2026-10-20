@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 能見度 GEO 示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.mk{display:inline-block;width:18px;text-align:center;}
+.ans{background:var(--surface-2);border:1px solid var(--frame);border-radius:4px;padding:10px 12px;font-size:13px;color:var(--ink-2);}
+.ans mark{background:rgba(57,135,229,.3);color:var(--ink);padding:0 2px;border-radius:2px;}
+.ans mark.cp{background:rgba(217,89,38,.3);}
+.sov .r{display:grid;grid-template-columns:70px 1fr 48px;gap:8px;align-items:center;font-size:12px;margin:4px 0;}
+.todo li{list-style:none;padding:4px 0;border-bottom:1px solid var(--grid);font-size:13px;}
+.todo{margin:0;padding:0;}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1>AI 搜尋能見度優化 GEO</h1><span class="en">Generative Engine Opt.</span>
+  <span class="tag">示範系統・虛構資料</span>
+</header>
+<main>
+  <p class="note">固定一份題庫，逐題問 AI 平台，記錄回答裡有沒有提到本公司或競品；找出被競品壓過的題目，補官網內容後重測。</p>
+  <div class="grid g4" id="kpis"></div>
+  <div class="grid g2" style="margin-top:12px">
+    <section class="panel">
+      <h2>題庫量測結果</h2>
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="搜尋題目" aria-label="搜尋題目">
+        <select id="f" aria-label="篩選"><option value="">全部題目</option><option value="weak">只看弱項（競品有、我們沒有）</option><option value="hit">只看有提到我們</option></select>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>題目</th><th title="AI 平台 1">平台1</th><th title="AI 平台 2">平台2</th><th title="AI 平台 3">平台3</th><th>補強</th></tr></thead>
+        <tbody id="list"></tbody>
+      </table></div>
+      <p class="note" style="margin-top:6px">● 提到本公司　◐ 只提到競品　○ 都沒提到。點題目看 AI 回答示範。</p>
+    </section>
+    <div class="grid" style="align-content:start">
+      <section class="panel">
+        <h2 id="aT">AI 回答示範</h2>
+        <div id="ans"><p class="empty">← 點一題</p></div>
+      </section>
+      <section class="panel sov">
+        <h2>聲量占比（Share of Voice）</h2>
+        <div id="sov"></div>
+        <div class="toolbar" style="margin-top:8px"><button class="btn" id="re">補完內容後重測（模擬）</button></div>
+      </section>
+      <section class="panel">
+        <h2>補強待辦</h2>
+        <ul class="todo" id="todo"></ul>
+      </section>
+    </div>
+  </div>
+</main>
+<p class="foot">本頁為戰情中心範本的示範系統，題目、品牌、量測結果皆為虛構；不會連到任何 AI 平台。</p>
+
+<script src="demo.js"></script>
+<script>
+// r：每個平台的結果 2＝提到本公司、1＝只提到競品、0＝都沒提到
+const QS = [
+  "辦公室適合用哪種自動泡茶設備？", "手搖飲店如何穩定茶湯品質？", "商用萃茶機推薦", "茶飲店省人力的做法",
+  "冷泡茶大量製作設備", "連鎖茶飲中央廚房要買什麼機器", "茶葉萃取溫度怎麼控制", "飯店早餐茶飲設備選擇",
+  "咖啡店想加賣茶飲需要什麼", "商用熱水機與萃茶機差別", "茶飲設備維修保養頻率", "自動化茶飲設備多少錢",
+  "如何減少茶湯苦澀", "海外茶飲店設備供應商", "茶飲設備有哪些安全認證", "小坪數茶飲店設備配置",
+  "奶茶店必備設備清單", "茶飲品質標準化方法", "觸控面板泡茶機好用嗎", "茶飲設備租賃還是購買",
+].map((t, i) => ({n: i + 1, t, r: [[2, 1, 0], [1, 1, 0], [2, 2, 1], [0, 1, 0], [1, 0, 1], [1, 1, 1], [2, 0, 0], [0, 0, 1], [1, 2, 0], [2, 1, 2]][i % 10].slice(), fix: false}));
+const TODO = ["官網補 FAQ 結構化資料", "社群同步同一句品牌介紹", "建立產業知識條目", "下一輪重測"];
+let sel = null, round = 1;
+
+const hasUs = q => q.r.includes(2);
+const weak = q => !hasUs(q) && q.r.includes(1);
+function rate(){ return QS.filter(hasUs).length / QS.length * 100; }
+function renderKpis(){
+  $("#kpis").innerHTML = [["題庫", QS.length, "題（示範子集）"], ["品牌提及率", rate().toFixed(1), "%"], ["弱項題目", QS.filter(weak).length, "題"], ["量測輪次", "第 " + round, "輪"]]
+    .map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}<small>${k[2]}</small></div></div>`).join("");
+}
+function renderList(){
+  const q = $("#q").value.trim(), f = $("#f").value, sym = ["○", "◐", "●"], cls = ["c-mut", "c-warn", "c-good"];
+  const rows = QS.filter(x => (!q || x.t.includes(q)) && (!f || (f === "weak" ? weak(x) : hasUs(x))));
+  $("#list").innerHTML = rows.map(x => `<tr class="click${x === sel ? " sel" : ""}" data-n="${x.n}" tabindex="0"><td>${x.n}</td><td>${esc(x.t)}</td>
+    ${x.r.map(v => `<td><span class="mk ${cls[v]}">${sym[v]}</span></td>`).join("")}
+    <td>${weak(x) ? `<button class="btn ghost" data-fix="${x.n}" ${x.fix ? "disabled" : ""}>${x.fix ? "已排入" : "補文章"}</button>` : ""}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="empty">沒有符合的題目</td></tr>`;
+}
+function renderSov(){
+  const us = QS.reduce((a, x) => a + x.r.filter(v => v === 2).length, 0);
+  const cp = QS.reduce((a, x) => a + x.r.filter(v => v >= 1).length, 0);
+  const d = [["本公司", us, "var(--s1)"], ["競品 A", Math.round(cp * 0.55), "var(--s2)"], ["競品 B", Math.round(cp * 0.35), "var(--plan)"]];
+  const tot = d.reduce((a, x) => a + x[1], 0);
+  $("#sov").innerHTML = d.map(x => `<div class="r"><span>${x[0]}</span><div class="bar"><i style="width:${x[1] / tot * 100}%;background:${x[2]}"></i></div><span class="num">${(x[1] / tot * 100).toFixed(0)}%</span></div>`).join("");
+  $("#todo").innerHTML = TODO.map(t => `<li>☐ ${t}</li>`).join("") + QS.filter(x => x.fix).map(x => `<li>☐ 針對第 ${x.n} 題寫官網文章：「${esc(x.t)}」</li>`).join("");
+}
+function renderAns(){
+  if (!sel) return;
+  const x = sel, v = x.r[0];
+  $("#aT").textContent = `AI 回答示範：#${x.n}`;
+  $("#ans").innerHTML = `<p class="note" style="margin:0 0 6px">問：${esc(x.t)}（平台 1）</p><div class="ans">
+    選擇設備時建議考慮出杯穩定度、清潔便利性與售後服務。${v === 2 ? `例如<mark>本公司（示範品牌）</mark>的自動萃茶設備，以及<mark class="cp">競品 A</mark>的機型。` : v === 1 ? `市面上常見的品牌有<mark class="cp">競品 A</mark>與<mark class="cp">競品 B</mark>。` : "目前市場上選擇很多，建議實際試用後再決定。"}
+    </div><p class="note" style="margin:6px 0 0">${v === 2 ? "✓ 有被提到" : v === 1 ? "⚠ 只有競品被提到 → 列為弱項，要補官網內容" : "沒有任何品牌被提到"}</p>`;
+}
+function renderAll(){ renderKpis(); renderList(); renderSov(); renderAns(); }
+
+$("#list").addEventListener("click", e => {
+  const fx = e.target.closest("[data-fix]");
+  if (fx){ QS[+fx.dataset.fix - 1].fix = true; toast("已加入補強待辦"); renderAll(); return; }
+  const r = e.target.closest("tr[data-n]"); if (r){ sel = QS[+r.dataset.n - 1]; renderAll(); }
+});
+$("#list").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("tr")) e.target.click(); });
+$("#q").addEventListener("input", renderList);
+$("#f").addEventListener("change", renderList);
+$("#re").addEventListener("click", () => {
+  const fixed = QS.filter(x => x.fix);
+  if (!fixed.length){ toast("先在題庫裡對弱項按「補文章」，再重測"); return; }
+  fixed.forEach(x => { x.r[0] = 2; x.fix = false; });
+  round++; toast(`第 ${round} 輪重測完成：${fixed.length} 題開始提到本公司`); renderAll();
+});
+renderAll();
+</script>
+</body>
+</html>

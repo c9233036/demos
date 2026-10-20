@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>海外名單收集示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.pipe div{background:var(--surface-2);border:1px solid var(--frame);border-radius:4px;padding:8px;text-align:center;font-size:12px;color:var(--ink-2);}
+.pipe div b{display:block;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums;}
+.pipe div.on{border-color:var(--s1);background:rgba(57,135,229,.16);}
+.cfg{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cfg label{font-size:12px;color:var(--ink-2);display:grid;gap:4px;}
+.cfg .full{grid-column:1/-1;}
+@media (max-width:600px){.pipe{grid-template-columns:repeat(2,1fr);}.cfg{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1>海外名單自動收集流程</h1><span class="en">Lead Collection</span>
+  <span class="tag">示範系統・虛構資料</span>
+  <span class="sp"></span>
+  <span class="pill c-good" id="sched">排程：每小時推送</span>
+</header>
+<main>
+  <div class="grid g4" id="kpis"></div>
+  <section class="panel" style="margin-top:12px">
+    <h2>收集管線</h2>
+    <div class="pipe" id="pipe"></div>
+  </section>
+
+  <div class="grid g2" style="margin-top:12px">
+    <section class="panel">
+      <h2>新增收集任務</h2>
+      <div class="cfg">
+        <label>目標城市<select id="city"><option>示範城市 A</option><option>示範城市 B</option><option>示範城市 C</option></select></label>
+        <label>每次上限<select id="cap"><option value="20">20 家</option><option value="50" selected>50 家</option><option value="100">100 家</option></select></label>
+        <label class="full">關鍵字<input id="kw" value="tea shop, bubble tea, cafe"></label>
+      </div>
+      <p class="note" style="margin:8px 0">付費動作一律先估金額、人工核准才執行；本頁只模擬，不會連到任何外部平台。</p>
+      <div class="toolbar">
+        <button class="btn" id="est">估算費用</button>
+        <button class="btn ok" id="run" disabled>核准並執行（模擬）</button>
+      </div>
+      <div class="bar" style="margin-top:6px"><i id="prog" style="width:0"></i></div>
+      <ul class="log" id="log" style="margin-top:8px"></ul>
+    </section>
+    <section class="panel">
+      <h2>名單（最新）</h2>
+      <div class="toolbar">
+        <select id="fGrade" aria-label="依分級篩選"><option value="">全部分級</option><option>VIP</option><option>一般</option><option>非目標</option></select>
+        <label class="note" style="margin:0"><input type="checkbox" id="fMail"> 只看有 Email</label>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>商家</th><th>城市</th><th>分級</th><th>Email</th><th>聯絡人</th></tr></thead>
+        <tbody id="list"></tbody>
+      </table></div>
+    </section>
+  </div>
+</main>
+<p class="foot">本頁為戰情中心範本的示範系統，商家名稱、城市、數字皆為虛構；資料只存在這個頁面，重新整理即還原。</p>
+
+<script src="demo.js"></script>
+<script>
+const W1 = ["Sunny", "Maple", "Harbor", "Willow", "Golden", "Lotus", "Cedar", "Blue", "Jade", "River", "Peach", "Cloud"];
+const W2 = ["Tea House", "Boba Bar", "Cafe", "Tea Lab", "Bakery", "Kitchen"];
+const CITIES = ["示範城市 A", "示範城市 B", "示範城市 C"];
+let seq = 0;
+function mk(city){
+  const i = seq++, w2 = W2[i % W2.length];
+  const grade = w2 === "Kitchen" || w2 === "Bakery" ? "非目標" : i % 3 === 0 ? "VIP" : "一般";
+  const mail = i % 10 < 3 ? "" : `info@${W1[i % W1.length].toLowerCase()}${i}.example`;
+  return {name: `${W1[i % W1.length]} ${w2} (Demo)`, city, grade, mail, contact: mail && i % 2 ? "店主（示範）" : ""};
+}
+let LEADS = Array.from({length: 24}, (_, i) => mk(CITIES[i % 3]));
+const C = {raw: 6200, dedup: 5000, mail: 1500, graded: 1500, pushed: 1200};
+const logs = [[ "10/20 07:30", "每日備份名單到地端：完成"], ["10/20 07:00", "推送 12 筆 VIP／一般到寄件流程"]];
+let estOk = false;
+
+function renderKpis(){
+  $("#kpis").innerHTML = [["收集名單", nf(C.dedup), "筆"], ["有 Email", nf(C.mail), "筆"], ["已推送寄件", nf(C.pushed), "筆"], ["本月費用", "$" + (12 + Math.round((C.raw - 6200) * 0.004)), "／上限 $50"]]
+    .map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}<small>${k[2]}</small></div></div>`).join("");
+}
+function renderPipe(on = -1){
+  $("#pipe").innerHTML = [["爬取商家", C.raw], ["去重後", C.dedup], ["補到 Email", C.mail], ["分級完成", C.graded], ["推送寄件", C.pushed]]
+    .map((p, i) => `<div class="${i === on ? "on" : ""}"><b>${nf(p[1])}</b>${p[0]}</div>`).join("");
+}
+function renderList(){
+  const g = $("#fGrade").value, m = $("#fMail").checked;
+  const rows = LEADS.filter(l => (!g || l.grade === g) && (!m || l.mail));
+  $("#list").innerHTML = rows.slice(0, 30).map(l => `<tr><td>${esc(l.name)}</td><td>${l.city}</td>
+    <td><span class="pill ${l.grade === "VIP" ? "c-warn" : l.grade === "一般" ? "c-s1" : "c-mut"}">${l.grade}</span></td>
+    <td>${l.mail ? esc(l.mail) : '<span class="c-mut">—</span>'}</td><td>${l.contact || '<span class="c-mut">—</span>'}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="empty">沒有符合的名單</td></tr>`;
+}
+function renderLog(){ $("#log").innerHTML = logs.map(l => `<li><time>${l[0]}</time>${esc(l[1])}</li>`).join(""); }
+
+$("#est").addEventListener("click", () => {
+  const cap = +$("#cap").value;
+  logs.unshift([nowStr(), `估算：${$("#city").value}、上限 ${cap} 家，預估費用約 $${(cap * 0.004).toFixed(2)}，等待核准`]);
+  estOk = true; $("#run").disabled = false; renderLog(); toast("已估算，確認後按「核准並執行」");
+});
+["#city", "#cap", "#kw"].forEach(s => $(s).addEventListener("input", () => { estOk = false; $("#run").disabled = true; }));
+$("#run").addEventListener("click", () => {
+  if (!estOk) return;
+  const cap = +$("#cap").value, city = $("#city").value;
+  $("#run").disabled = $("#est").disabled = true; estOk = false;
+  let step = 0;
+  const names = ["爬取商家", "去重", "補 Email／聯絡人", "分級", "推送寄件流程"];
+  const t = setInterval(() => {
+    $("#prog").style.width = (step + 1) * 20 + "%"; renderPipe(step);
+    logs.unshift([nowStr(), `${names[step]}…完成`]); renderLog();
+    if (++step === 5){
+      clearInterval(t);
+      const fresh = Array.from({length: Math.min(cap, 12)}, () => mk(city));
+      const dup = Math.round(cap * 0.15), withMail = Math.round((cap - dup) * 0.35);
+      C.raw += cap; C.dedup += cap - dup; C.mail += withMail; C.graded += withMail;
+      C.pushed += fresh.filter(l => l.mail && l.grade !== "非目標").length;
+      LEADS = fresh.concat(LEADS);
+      logs.unshift([nowStr(), `任務完成：新增 ${cap - dup} 筆（重複 ${dup} 筆已略過）、補到 Email ${withMail} 筆`]);
+      $("#est").disabled = false; $("#prog").style.width = "0";
+      renderKpis(); renderPipe(); renderList(); renderLog(); toast("收集完成，名單已更新");
+    }
+  }, 600);
+});
+$("#fGrade").addEventListener("change", renderList);
+$("#fMail").addEventListener("change", renderList);
+renderKpis(); renderPipe(); renderList(); renderLog();
+</script>
+</body>
+</html>

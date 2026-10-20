@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CRM 客戶資料庫示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.detail dl{display:grid;grid-template-columns:72px 1fr;gap:4px 10px;margin:0 0 12px;font-size:13px;}
+.detail dt{color:var(--muted);}.detail dd{margin:0;}
+form.rep{display:grid;gap:8px;margin:0 0 12px;}
+form.rep .row{display:flex;gap:8px;flex-wrap:wrap;}
+form.rep .row > *{flex:1;min-width:120px;}
+.dup{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;}
+.dup .box{border:1px solid var(--frame);border-radius:4px;padding:8px 10px;font-size:13px;}
+@media (max-width:600px){.dup{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1>多區域客戶關係資料庫 CRM</h1><span class="en">Regional CRM</span>
+  <span class="tag">示範系統・虛構資料</span>
+</header>
+<main>
+  <div class="grid g4" id="kpis"></div>
+  <div class="tabs" data-tabs="main" style="margin-top:12px">
+    <button data-tab="cust">客戶與日報</button>
+    <button data-tab="dup">重複客戶合併</button>
+  </div>
+
+  <section data-group="main" data-pane="cust">
+    <div class="grid g2">
+      <div class="panel">
+        <h2>客戶主檔</h2>
+        <div class="toolbar">
+          <input type="search" id="q" placeholder="搜尋客戶名稱" aria-label="搜尋客戶">
+          <select id="fRg" aria-label="依區域篩選"><option value="">全部區域</option><option>北區</option><option>中區</option><option>南區</option><option>海外</option></select>
+          <select id="fLv" aria-label="依等級篩選"><option value="">全部等級</option><option>A</option><option>B</option><option>C</option></select>
+        </div>
+        <div class="tw"><table>
+          <thead><tr><th>客戶</th><th>區域</th><th>等級</th><th>負責業務</th><th class="num">日報</th></tr></thead>
+          <tbody id="list"></tbody>
+        </table></div>
+      </div>
+      <div class="panel detail">
+        <h2 id="dTitle">客戶詳情</h2>
+        <p class="empty" id="dEmpty">← 點一家客戶</p>
+        <div id="dBody" hidden>
+          <dl id="dInfo"></dl>
+          <h2>新增業務日報</h2>
+          <form class="rep" id="rep">
+            <div class="row">
+              <select id="rType" aria-label="拜訪類型"><option>電話</option><option>拜訪</option><option>展示</option><option>報價</option><option>售後</option></select>
+              <select id="rNext" aria-label="下一步"><option>持續追蹤</option><option>安排展示</option><option>送報價</option><option>結案</option></select>
+            </div>
+            <textarea id="rText" rows="2" placeholder="這次聯絡的重點（示範輸入，不會送出）" aria-label="日報內容"></textarea>
+            <button class="btn" type="submit">送出日報</button>
+          </form>
+          <h2>往來紀錄</h2>
+          <ul class="log" id="dLog"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-group="main" data-pane="dup" hidden>
+    <div class="panel">
+      <h2>同名重複客戶</h2>
+      <p class="note">不同業務各自建檔，常出現同一家客戶兩筆資料。合併時聯絡人、日報全部轉到保留的那一筆，衝突的欄位另存備註，資料不會不見；合併前系統自動備份。</p>
+      <div id="dups"></div>
+    </div>
+  </section>
+</main>
+<p class="foot">本頁為戰情中心範本的示範系統，客戶、人名、往來內容皆為虛構；資料只存在這個頁面，重新整理即還原。</p>
+
+<script src="demo.js"></script>
+<script>
+const RG = ["北區", "中區", "南區", "海外"], REPS = ["業務 甲", "業務 乙", "業務 丙", "業務 丁"];
+const BR = ["晴天", "山嵐", "海灣", "綠野", "初心", "日光", "微風", "森語", "星河", "暖陽", "雲朵", "小巷", "清泉", "麥田"];
+const KD = ["茶飲", "咖啡", "烘焙", "餐廳", "飯店", "連鎖手搖"];
+const NOTES = ["詢問新機型價格", "現場試機，反應良好", "要求提供維修保固說明", "決策者下週回覆", "已送報價單", "反映濾心更換頻率", "介紹給同業"];
+let CUST = BR.map((b, i) => ({
+  id: i + 1, name: `${b}${KD[i % KD.length]}（示範）`, rg: RG[i % 4], lv: "ABC"[i % 3], rep: REPS[i % 4],
+  contact: `聯絡人 ${String.fromCharCode(65 + i)}`, phone: `0900-000-${String(100 + i * 7).slice(-3)}`,
+  logs: Array.from({length: 1 + (i * 3) % 5}, (_, k) => [`10/${pad(18 - k * 3 - (i % 3))}`, `${REPS[i % 4]}・${["電話", "拜訪", "展示"][k % 3]}：${NOTES[(i + k) % NOTES.length]}`]),
+}));
+let DUPS = [
+  [{name: "晴天茶飲（示範）", rep: "業務 甲", contacts: 2, logs: 5, phone: "0900-000-100"}, {name: "晴天茶飲 （示範）", rep: "業務 丙", contacts: 1, logs: 3, phone: "0900-000-999"}],
+  [{name: "星河餐廳（示範）", rep: "業務 乙", contacts: 1, logs: 2, phone: "0900-000-156"}, {name: "星河餐廳(示範)", rep: "業務 丁", contacts: 2, logs: 4, phone: "0900-000-156"}],
+];
+let sel = null, totalLogs = 10000, merged = 0;
+
+function renderKpis(){
+  $("#kpis").innerHTML = [["客戶主檔", nf(2000 - merged), "家"], ["業務日報", nf(totalLogs), "筆"], ["本月新增日報", 312 + (totalLogs - 10000), "筆"], ["待合併重複", DUPS.length, "組"]]
+    .map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}<small>${k[2]}</small></div></div>`).join("");
+}
+function renderList(){
+  const q = $("#q").value.trim(), r = $("#fRg").value, l = $("#fLv").value;
+  const rows = CUST.filter(c => (!q || c.name.includes(q)) && (!r || c.rg === r) && (!l || c.lv === l));
+  $("#list").innerHTML = rows.length ? rows.map(c => `<tr class="click${c === sel ? " sel" : ""}" data-id="${c.id}" tabindex="0">
+    <td>${esc(c.name)}</td><td>${c.rg}</td><td><span class="pill ${c.lv === "A" ? "c-good" : c.lv === "B" ? "c-s1" : "c-mut"}">${c.lv}</span></td>
+    <td>${c.rep}</td><td class="num">${c.logs.length}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">沒有符合的客戶</td></tr>`;
+}
+function renderDetail(){
+  $("#dEmpty").hidden = !!sel; $("#dBody").hidden = !sel;
+  if (!sel) return;
+  $("#dTitle").textContent = sel.name;
+  $("#dInfo").innerHTML = `<dt>區域</dt><dd>${sel.rg}</dd><dt>等級</dt><dd>${sel.lv}</dd><dt>負責業務</dt><dd>${sel.rep}</dd>
+    <dt>聯絡人</dt><dd>${sel.contact}（${sel.phone}）</dd>`;
+  $("#dLog").innerHTML = sel.logs.map(l => `<li><time>${l[0]}</time>${esc(l[1])}</li>`).join("");
+}
+function renderDups(){
+  $("#dups").innerHTML = DUPS.length ? DUPS.map((d, i) => `<div class="panel" style="margin-bottom:10px">
+    <div class="dup">
+      <div class="box"><b>保留：</b>${esc(d[0].name)}<br>${d[0].rep}・聯絡人 ${d[0].contacts}・日報 ${d[0].logs}・${d[0].phone}</div>
+      <div style="text-align:center">⟵ 合併</div>
+      <div class="box"><b>併入：</b>${esc(d[1].name)}<br>${d[1].rep}・聯絡人 ${d[1].contacts}・日報 ${d[1].logs}・${d[1].phone}</div>
+    </div>
+    <p class="note" style="margin:8px 0">${d[0].phone !== d[1].phone ? "⚠ 電話不同：保留方的電話留用，另一支存進備註，不會丟掉。" : "欄位無衝突。"}</p>
+    <button class="btn" data-merge="${i}">確認合併</button></div>`).join("") : `<p class="empty">✓ 目前沒有重複客戶</p>`;
+}
+function renderAll(){ renderKpis(); renderList(); renderDetail(); renderDups(); }
+
+$("#list").addEventListener("click", e => { const r = e.target.closest("tr[data-id]"); if (r){ sel = CUST.find(c => c.id === +r.dataset.id); renderAll(); } });
+$("#list").addEventListener("keydown", e => { if (e.key === "Enter") e.target.click(); });
+["#q", "#fRg", "#fLv"].forEach(s => $(s).addEventListener("input", renderList));
+$("#rep").addEventListener("submit", e => {
+  e.preventDefault();
+  const t = $("#rText").value.trim();
+  if (!t){ toast("請先寫這次聯絡的重點"); return; }
+  const d = new Date();
+  sel.logs.unshift([`${d.getMonth() + 1}/${pad(d.getDate())}`, `${sel.rep}・${$("#rType").value}：${t}（下一步：${$("#rNext").value}）`]);
+  totalLogs++; $("#rText").value = ""; toast("日報已送出，主管端即時看得到"); renderAll();
+});
+$("#dups").addEventListener("click", e => {
+  const b = e.target.closest("[data-merge]"); if (!b) return;
+  const d = DUPS.splice(+b.dataset.merge, 1)[0];
+  merged++; toast(`已備份並合併：聯絡人 ${d[1].contacts} 位、日報 ${d[1].logs} 筆轉到「${d[0].name}」`); renderAll();
+});
+initTabs();
+renderAll();
+</script>
+</body>
+</html>

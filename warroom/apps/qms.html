@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QMS 認證系統示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.viewer{position:relative;background:#f4f4f0;border-radius:4px;aspect-ratio:1/1.3;max-height:460px;margin:0 auto;overflow:hidden;user-select:none;}
+.viewer canvas{width:100%;height:100%;display:block;}
+.lock{font-size:12px;color:var(--muted);margin-top:6px;}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1>品質／認證文件管理 QMS</h1><span class="en">Quality Mgmt System</span>
+  <span class="tag">示範系統・虛構資料</span>
+  <span class="sp"></span>
+  <label class="note" style="margin:0">切換身分
+    <select id="role" aria-label="切換登入身分">
+      <option value="0">一般同仁</option>
+      <option value="1">一階主管</option>
+      <option value="2" selected>二階主管</option>
+      <option value="3">三階主管（最高）</option>
+    </select>
+  </label>
+</header>
+<main>
+  <div class="grid g4" id="kpis"></div>
+  <div class="tabs" data-tabs="main" style="margin-top:12px">
+    <button data-tab="docs">文件庫</button>
+    <button data-tab="sign">簽核流程</button>
+    <button data-tab="reg">法規監控</button>
+    <button data-tab="audit">稽核紀錄</button>
+  </div>
+
+  <section data-group="main" data-pane="docs">
+    <div class="grid g2">
+      <div class="panel">
+        <h2>認證文件庫</h2>
+        <div class="toolbar">
+          <input type="search" id="q" placeholder="搜尋文件名稱" aria-label="搜尋文件">
+          <select id="fLv" aria-label="依密級篩選"><option value="">全部密級</option><option>公開</option><option>限閱</option><option>機密</option></select>
+        </div>
+        <div class="tw"><table>
+          <thead><tr><th>文件編號</th><th>名稱</th><th>類別</th><th>密級</th><th>有效期限</th></tr></thead>
+          <tbody id="docs"></tbody>
+        </table></div>
+        <p class="note" style="margin-top:6px">密級規則：公開＝全員可看；限閱＝二階以上主管；機密＝三階主管。換身分看看清單怎麼變。</p>
+      </div>
+      <div class="panel">
+        <h2 id="vTitle">文件檢視</h2>
+        <div id="vEmpty" class="empty">← 點一份文件檢視</div>
+        <div id="vBody" hidden>
+          <div class="viewer"><canvas id="cv" width="520" height="676"></canvas></div>
+          <p class="lock">🔒 文件以圖片方式顯示並加上浮水印（檢視者＋時間），不提供下載；每次開啟都寫入稽核紀錄。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-group="main" data-pane="sign" hidden>
+    <div class="panel">
+      <h2>多關簽核（指定三階 → 二階 → 一階）</h2>
+      <div class="tw"><table>
+        <thead><tr><th>單號</th><th>文件</th><th>送簽人</th><th>關卡</th><th>狀態</th><th></th></tr></thead>
+        <tbody id="signs"></tbody>
+      </table></div>
+      <p class="note" style="margin-top:6px">只有輪到的那一階主管看得到「核准／退回」。用右上角切換身分試試。</p>
+    </div>
+  </section>
+
+  <section data-group="main" data-pane="reg" hidden>
+    <div class="grid g2">
+      <div class="panel">
+        <h2>法規來源監控（每月 1 號自動比對）</h2>
+        <div class="tw"><table>
+          <thead><tr><th>法規來源</th><th>上次比對</th><th>結果</th></tr></thead>
+          <tbody id="regs"></tbody>
+        </table></div>
+        <div class="toolbar" style="margin-top:10px"><button class="btn" id="runReg">立即執行比對（模擬）</button></div>
+      </div>
+      <div class="panel">
+        <h2>異動處理單</h2>
+        <ul class="log" id="tickets"></ul>
+        <p class="note" style="margin-top:6px">比對到網頁內容有變 → 自動寄 Email 給品保 → 開立處理單指定負責人。</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-group="main" data-pane="audit" hidden>
+    <div class="panel">
+      <h2>稽核紀錄（登入／檢視／簽核）</h2>
+      <ul class="log" id="audit"></ul>
+    </div>
+  </section>
+</main>
+<p class="foot">本頁為戰情中心範本的示範系統，文件、人名、法規來源皆為虛構；資料只存在這個頁面，重新整理即還原。</p>
+
+<script src="demo.js"></script>
+<script>
+const LV = {"公開": 0, "限閱": 2, "機密": 3};
+const LVC = {"公開": "c-good", "限閱": "c-warn", "機密": "c-crit"};
+const DOCS = [
+  ["QD-001", "ISO 9001 品質手冊", "管理系統", "公開", "2028-06-30"],
+  ["QD-002", "電器安全認證證書（示範 A）", "產品認證", "公開", "2027-03-31"],
+  ["QD-003", "食品接觸材料檢驗報告", "檢驗報告", "限閱", "2027-01-15"],
+  ["QD-004", "電磁相容測試報告", "檢驗報告", "限閱", "2026-12-20"],
+  ["QD-005", "衛生安全認證（示範 B）", "產品認證", "公開", "2028-09-01"],
+  ["QD-006", "關鍵零件供應商評鑑表", "供應商", "機密", "2027-05-10"],
+  ["QD-007", "內部稽核報告 2026 上半年", "內部稽核", "限閱", "—"],
+  ["QD-008", "產品安全設計規範", "設計", "機密", "—"],
+  ["QD-009", "標準作業程序：進料檢驗", "SOP", "公開", "—"],
+  ["QD-010", "能源效率標示證明", "產品認證", "公開", "2026-11-30"],
+  ["QD-011", "客訴分析月報", "品質紀錄", "限閱", "—"],
+  ["QD-012", "量產前驗證報告（示範機型）", "設計", "機密", "—"],
+];
+const SIGNS = [
+  {no: "SG-2026-031", doc: "標準作業程序：出貨檢驗 v2", who: "品保 甲", lv: 3, st: "待簽"},
+  {no: "SG-2026-032", doc: "供應商評鑑表（新增 2 家）", who: "採購 乙", lv: 2, st: "待簽"},
+  {no: "SG-2026-033", doc: "內部稽核矯正措施", who: "品保 甲", lv: 1, st: "待簽"},
+  {no: "SG-2026-029", doc: "產品安全設計規範 v3", who: "研發 丙", lv: 0, st: "已發行"},
+];
+const LVN = ["一般同仁", "一階主管", "二階主管", "三階主管"];
+const REGS = [
+  ["電器安全標準公告（示範來源 1）", "相同"], ["食品器具衛生標準（示範來源 2）", "相同"],
+  ["能源效率標示規定（示範來源 3）", "相同"], ["電磁相容測試規範（示範來源 4）", "相同"],
+  ["進口商品檢驗公告（示範來源 5）", "相同"], ["海外安規更新公告（示範來源 6）", "相同"],
+];
+const TICKETS = [["9/01 08:00", "處理單 RM-0901：示範來源 3 修訂附表，負責人 品保 甲 → 已結案"]];
+const AUDIT = [];
+const role = () => +$("#role").value;
+const roleName = () => LVN[role()];
+const audit = msg => { AUDIT.unshift([nowStr(), `${roleName()}（示範）${msg}`]); renderAudit(); };
+let cur = null;
+
+function renderKpis(){
+  const soon = DOCS.filter(d => d[4] !== "—" && d[4] < "2027-01-01").length;
+  $("#kpis").innerHTML = [["文件總數", "1,000", "份"], ["監控證書", 10, "張"], ["90 天內到期", soon, "份"], ["待我簽核", SIGNS.filter(s => s.st === "待簽" && s.lv === role()).length, "件"]]
+    .map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}<small>${k[2]}</small></div></div>`).join("");
+}
+function renderDocs(){
+  const q = $("#q").value.trim(), f = $("#fLv").value;
+  const rows = DOCS.filter(d => (!q || d[1].includes(q)) && (!f || d[3] === f));
+  $("#docs").innerHTML = rows.map(d => {
+    const ok = role() >= LV[d[3]];
+    return `<tr class="${ok ? "click" : ""}${cur === d[0] ? " sel" : ""}" data-id="${d[0]}" ${ok ? 'tabindex="0"' : ""}>
+      <td>${d[0]}</td><td>${ok ? esc(d[1]) : '<span class="c-mut">🔒 權限不足</span>'}</td><td>${d[2]}</td>
+      <td><span class="pill ${LVC[d[3]]}">${d[3]}</span></td><td>${d[4]}</td></tr>`;
+  }).join("");
+}
+function drawDoc(d){
+  const cv = $("#cv"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  g.fillStyle = "#fbfbf7"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#1b2a3a"; g.font = "bold 22px sans-serif"; g.fillText(d[1], 36, 64);
+  g.font = "13px sans-serif"; g.fillStyle = "#56657a";
+  g.fillText(`文件編號 ${d[0]}　類別 ${d[2]}　有效期限 ${d[4]}`, 36, 92);
+  g.fillStyle = "#c9d2dc"; g.fillRect(36, 108, W - 72, 2);
+  for (let i = 0; i < 20; i++){ g.fillStyle = "#d5dbe3"; g.fillRect(36, 136 + i * 24, (W - 72) * (0.55 + ((i * 37) % 45) / 100), 9); }
+  g.save(); g.translate(W / 2, H / 2); g.rotate(-Math.PI / 6);
+  g.fillStyle = "rgba(208,59,59,.16)"; g.font = "bold 30px sans-serif"; g.textAlign = "center";
+  for (let y = -300; y <= 300; y += 120) g.fillText(`${roleName()}（示範）${nowStr()} 僅供檢視`, 0, y);
+  g.restore();
+}
+function renderSigns(){
+  $("#signs").innerHTML = SIGNS.map((s, i) => {
+    const mine = s.st === "待簽" && s.lv === role();
+    return `<tr><td>${s.no}</td><td>${esc(s.doc)}</td><td>${s.who}</td>
+      <td>${s.st === "待簽" ? "輪到 " + LVN[s.lv] : "—"}</td>
+      <td><span class="pill ${s.st === "已發行" ? "c-good" : s.st === "退回" ? "c-crit" : "c-warn"}">${s.st}</span></td>
+      <td>${mine ? `<button class="btn ok" data-ok="${i}">核准</button> <button class="btn no" data-no="${i}">退回</button>` : ""}</td></tr>`;
+  }).join("");
+}
+function renderRegs(){
+  $("#regs").innerHTML = REGS.map(r => `<tr><td>${r[0]}</td><td>${r[2] || "10/01 06:00"}</td>
+    <td><span class="pill ${r[1] === "有異動" ? "c-crit" : "c-good"}">${r[1]}</span></td></tr>`).join("");
+  $("#tickets").innerHTML = TICKETS.map(t => `<li><time>${t[0]}</time>${esc(t[1])}</li>`).join("");
+}
+function renderAudit(){
+  $("#audit").innerHTML = AUDIT.length ? AUDIT.map(a => `<li><time>${a[0]}</time>${esc(a[1])}</li>`).join("") : `<li class="c-mut">尚無紀錄</li>`;
+}
+function renderAll(){ renderKpis(); renderDocs(); renderSigns(); renderRegs(); renderAudit(); }
+
+$("#docs").addEventListener("click", e => {
+  const r = e.target.closest("tr.click"); if (!r) return;
+  const d = DOCS.find(x => x[0] === r.dataset.id); cur = d[0];
+  $("#vTitle").textContent = d[1]; $("#vEmpty").hidden = true; $("#vBody").hidden = false;
+  drawDoc(d); audit(`檢視 ${d[0]} ${d[1]}`); renderDocs();
+});
+$("#docs").addEventListener("keydown", e => { if (e.key === "Enter") e.target.click(); });
+$("#cv").addEventListener("contextmenu", e => { e.preventDefault(); toast("此文件不提供下載或另存"); });
+$("#q").addEventListener("input", renderDocs);
+$("#fLv").addEventListener("change", renderDocs);
+$("#role").addEventListener("change", () => {
+  const d = DOCS.find(x => x[0] === cur);
+  if (d && role() < LV[d[3]]){ cur = null; $("#vEmpty").hidden = false; $("#vBody").hidden = true; $("#vTitle").textContent = "文件檢視"; }
+  audit("切換身分登入"); renderAll();
+});
+$("#signs").addEventListener("click", e => {
+  const ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]");
+  if (!ok && !no) return;
+  const s = SIGNS[+(ok || no).dataset[ok ? "ok" : "no"]];
+  if (no){ s.st = "退回"; audit(`退回簽核單 ${s.no}`); toast("已退回給送簽人"); }
+  else { s.lv--; if (s.lv < 1){ s.st = "已發行"; toast("最後一關核准，文件已發行"); } else toast(`已核准，送往 ${LVN[s.lv]}`); audit(`核准簽核單 ${s.no}`); }
+  renderAll();
+});
+$("#runReg").addEventListener("click", () => {
+  const b = $("#runReg"); b.disabled = true; b.textContent = "比對中…";
+  setTimeout(() => {
+    REGS.forEach(r => { r[1] = "相同"; r[2] = nowStr(); });
+    const hit = REGS[Math.floor(Math.random() * REGS.length)]; hit[1] = "有異動";
+    TICKETS.unshift([nowStr(), `處理單 RM-${Date.now() % 10000}：${hit[0]} 內容有變動，已寄 Email 通知品保，負責人 品保 甲 → 處理中`]);
+    audit(`執行法規比對，發現 1 筆異動`);
+    b.disabled = false; b.textContent = "立即執行比對（模擬）"; renderAll(); toast("比對完成：1 個來源有異動，已開處理單");
+  }, 900);
+});
+initTabs();
+audit("登入系統");
+renderAll();
+</script>
+</body>
+</html>

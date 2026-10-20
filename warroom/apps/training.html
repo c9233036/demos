@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>教育訓練系統示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.crumb{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;margin:0 0 12px;}
+.crumb button{background:none;border:none;color:var(--s1);padding:0;}
+.crumb span{color:var(--muted);}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;}
+.card{background:var(--surface);border:1px solid var(--frame);border-radius:6px;padding:14px;text-align:left;min-height:92px;}
+.card:hover{border-color:var(--s1);}
+.card b{display:block;font-size:15px;margin-bottom:4px;}
+.card small{color:var(--muted);}
+.ico{font-size:22px;display:block;margin-bottom:6px;}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
+.player{aspect-ratio:16/9;background:#000;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#9fb6d4;font-size:13px;position:relative;overflow:hidden;}
+.player .pb{position:absolute;left:0;bottom:0;height:4px;background:var(--s1);width:0;transition:width .25s linear;}
+.ex{width:100%;height:auto;background:var(--surface-2);border-radius:4px;}
+.ex g{cursor:pointer;}
+.ex g:hover rect,.ex g.on rect{stroke:var(--s2);stroke-width:2;}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1 id="h1">客戶教育訓練系統</h1><span class="en">Customer Training</span>
+  <span class="tag" id="tag">示範系統・虛構資料</span>
+  <span class="sp"></span>
+  <div class="tabs" data-tabs="lang" style="margin:0" aria-label="語言">
+    <button data-tab="zh">中文</button><button data-tab="en">English</button>
+  </div>
+</header>
+<main>
+  <p class="note" id="intro"></p>
+  <nav class="crumb" id="crumb" aria-label="目前位置"></nav>
+  <div id="view"></div>
+</main>
+<p class="foot" id="foot"></p>
+<span data-group="lang" data-pane="zh" hidden></span><span data-group="lang" data-pane="en" hidden></span>
+
+<script src="demo.js"></script>
+<script>
+// 四層導覽：分類 → 子分類 → 系列 → 型號 → 手冊／影片／爆炸圖
+const TREE = {
+  "飲品設備|Beverage": {
+    "沖煮機|Brewers": {"A 系列|Series A": ["A-100", "A-200", "A-300"], "B 系列|Series B": ["B-10", "B-20"]},
+    "萃取機|Extractors": {"C 系列|Series C": ["C-1", "C-2"]},
+  },
+  "加熱設備|Heating": {
+    "熱水機|Water Heaters": {"H 系列|Series H": ["H-6", "H-12"]},
+    "蒸氣機|Steamers": {"S 系列|Series S": ["S-1", "S-2", "S-3"]},
+  },
+  "周邊配件|Accessories": {
+    "濾水設備|Filtration": {"F 系列|Series F": ["F-01", "F-02"]},
+  },
+};
+const T = {
+  zh: {intro: "客戶與經銷商自己查手冊、看影片、點爆炸圖找零件，減少重複教學。依「分類 → 子分類 → 系列 → 型號」四層往下點。",
+       home: "全部分類", manual: "操作手冊", video: "教學影片", ex: "維修爆炸圖", play: "▶ 播放（示範）", pages: "頁",
+       dl: "線上閱讀（示範）", items: "項", models: "款型號", pick: "點零件看料號與更換說明",
+       foot: "本頁為戰情中心範本的示範系統，機型、料號、內容皆為虛構。", h1: "客戶教育訓練系統", tag: "示範系統・虛構資料",
+       vids: ["開機與每日保養", "更換濾心", "清洗流程", "常見錯誤碼排除"], parts: ["上蓋", "控制面板", "加熱模組", "幫浦", "底座"]},
+  en: {intro: "Customers and dealers look up manuals, watch videos and find spare parts on exploded views by themselves. Drill down: Category → Sub-category → Series → Model.",
+       home: "All categories", manual: "User manual", video: "Training videos", ex: "Exploded view", play: "▶ Play (demo)", pages: "pages",
+       dl: "Read online (demo)", items: "items", models: "models", pick: "Click a part for its part no. and replacement notes",
+       foot: "Demo system of the war-room template. All models, part numbers and content are fictional.", h1: "Customer Training", tag: "Demo · fictional data",
+       vids: ["Power-on & daily care", "Replacing the filter", "Cleaning cycle", "Error code troubleshooting"], parts: ["Top cover", "Control panel", "Heater module", "Pump", "Base"]},
+};
+let lang = "zh", path = [];
+const L = s => s.split("|")[lang === "zh" ? 0 : 1];
+const tx = () => T[lang];
+
+function nodeAt(p){ let n = TREE; p.forEach(k => n = n[k]); return n; }
+function count(n){ return Array.isArray(n) ? n.length : Object.values(n).reduce((a, v) => a + count(v), 0); }
+function render(){
+  $("#intro").textContent = tx().intro; $("#foot").textContent = tx().foot;
+  $("#h1").textContent = tx().h1; $("#tag").textContent = tx().tag;
+  document.documentElement.lang = lang === "zh" ? "zh-Hant" : "en";
+  $("#crumb").innerHTML = [`<button data-depth="0">${tx().home}</button>`]
+    .concat(path.map((k, i) => `<span>›</span>` + (i < path.length - 1 ? `<button data-depth="${i + 1}">${esc(L(k))}</button>` : `<b>${esc(path.length === 4 ? k : L(k))}</b>`))).join("");
+  if (path.length === 4) return renderModel(path[3]);
+  const n = nodeAt(path);
+  const keys = Array.isArray(n) ? n : Object.keys(n);
+  const icons = ["📁", "📂", "🗂️", "⚙️"];
+  $("#view").innerHTML = `<div class="cards">` + keys.map(k => `<button class="card" data-k="${esc(k)}">
+    <span class="ico">${icons[path.length]}</span><b>${esc(path.length === 3 ? k : L(k))}</b>
+    <small>${path.length === 3 ? "3 " + tx().items : count(n[k]) + " " + tx().models}</small></button>`).join("") + `</div>`;
+}
+function renderModel(m){
+  const t = tx();
+  const pn = i => `${m}-P${pad(i + 1)}`;
+  $("#view").innerHTML = `<div class="res">
+    <section class="panel"><h2>📘 ${t.manual}</h2>
+      <p>${esc(m)} ${t.manual}　·　${24 + m.length * 3} ${t.pages}</p>
+      <button class="btn ghost" data-act="manual">${t.dl}</button></section>
+    <section class="panel"><h2>🎬 ${t.video}</h2>
+      <div class="player" id="player"><span id="ptxt">${t.vids[0]}</span><i class="pb" id="pb"></i></div>
+      <div class="toolbar" style="margin-top:8px">${t.vids.map((v, i) => `<button class="btn ghost" data-v="${i}">${esc(v)}</button>`).join("")}</div>
+      <button class="btn" data-act="play">${t.play}</button></section>
+    <section class="panel"><h2>🔧 ${t.ex}</h2>
+      <svg class="ex" viewBox="0 0 300 260" role="img" aria-label="${t.ex}">
+        ${t.parts.map((p, i) => `<g data-p="${i}"><rect x="${60 + (i % 2) * 70}" y="${18 + i * 46}" width="${180 - (i % 2) * 70}" height="32" rx="4"
+          fill="rgba(42,114,208,${.10 + i * .06})" stroke="#a9bdd6"/><text x="${66 + (i % 2) * 70}" y="${39 + i * 46}" fill="#10213a" font-size="12">${i + 1}. ${esc(p)}</text></g>`).join("")}
+        <line x1="150" y1="0" x2="150" y2="260" stroke="#6e87a8" stroke-dasharray="3 4" opacity=".4"/>
+      </svg>
+      <p class="note" id="pinfo" style="margin-top:6px">${t.pick}</p></section>
+  </div>`;
+  let vi = 0, timer = 0;
+  $("#view").onclick = e => {
+    const v = e.target.closest("[data-v]"), a = e.target.closest("[data-act]"), g = e.target.closest("g[data-p]");
+    if (v){ vi = +v.dataset.v; $("#ptxt").textContent = t.vids[vi]; $("#pb").style.width = "0"; clearInterval(timer); }
+    if (a && a.dataset.act === "play"){
+      clearInterval(timer); let w = 0; $("#ptxt").textContent = "▶ " + t.vids[vi];
+      timer = setInterval(() => { w += 4; $("#pb").style.width = w + "%"; if (w >= 100){ clearInterval(timer); $("#ptxt").textContent = "✓ " + t.vids[vi]; } }, 120);
+    }
+    if (a && a.dataset.act === "manual") toast(lang === "zh" ? "示範：正式系統會在這裡開啟線上手冊" : "Demo: the real system opens the online manual here");
+    if (g){
+      $$("g[data-p]").forEach(x => x.classList.toggle("on", x === g));
+      const i = +g.dataset.p;
+      $("#pinfo").innerHTML = `<b>${esc(t.parts[i])}</b>　${lang === "zh" ? "料號" : "Part no."} ${pn(i)}　·　${lang === "zh" ? "更換時間約 " + (10 + i * 5) + " 分鐘" : "about " + (10 + i * 5) + " min to replace"}`;
+    }
+  };
+}
+$("#crumb").addEventListener("click", e => { const b = e.target.closest("[data-depth]"); if (b){ path = path.slice(0, +b.dataset.depth); render(); } });
+$("#view").addEventListener("click", e => { const c = e.target.closest(".card[data-k]"); if (c){ path.push(c.dataset.k); render(); } });
+initTabs(k => { lang = k; render(); });
+</script>
+</body>
+</html>

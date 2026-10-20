@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>智慧農場 3D 示範</title>
+<style>
+  html, body { margin:0; padding:0; overflow:hidden; width:100%; height:100%; background:#050b18; font-family:'Consolas','Microsoft JhengHei',monospace; }
+  #canvas-holder { width:100%; height:100%; }
+  #panel {
+    position:absolute; top:16px; left:16px; z-index:5;
+    background:rgba(4,20,26,0.82); border:1px solid #1fd8d8; border-radius:10px; padding:14px 18px;
+    box-shadow:0 0 18px rgba(31,216,216,0.35); max-width:270px; color:#bdf5f5;
+  }
+  #panel h1 { font-size:15px; margin:0 0 4px 0; color:#4dfcff; text-shadow:0 0 8px rgba(77,252,255,0.8); letter-spacing:1px; }
+  #panel .sub { font-size:10.5px; color:#5aa; margin-bottom:8px; }
+  #live { display:flex; align-items:center; gap:6px; font-size:11px; color:#7fffb0; margin-bottom:8px; }
+  #live .dot { width:8px; height:8px; border-radius:50%; background:#3dff8a; box-shadow:0 0 8px #3dff8a; animation:blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+  #dataFeed div { font-size:11.5px; margin:3px 0; display:flex; justify-content:space-between; border-bottom:1px dashed rgba(77,252,255,0.15); padding-bottom:2px; }
+  #dataFeed .k { color:#8fd8d8; }
+  #dataFeed .v { color:#e8fffb; font-weight:700; }
+  #controls-hint { font-size:10.5px; color:#5aa; margin-top:8px; line-height:1.5; border-top:1px solid rgba(77,252,255,0.25); padding-top:6px; }
+  #buttons { position:absolute; top:16px; right:16px; z-index:5; display:flex; flex-direction:column; gap:8px; }
+  #buttons button {
+    background:rgba(4,20,26,0.82); border:1px solid #1fd8d8; border-radius:8px; padding:8px 12px;
+    font-size:12px; cursor:pointer; color:#8fffef; font-weight:600; box-shadow:0 0 10px rgba(31,216,216,0.25);
+  }
+  #buttons button:hover { background:rgba(31,216,216,0.18); }
+  #buttons button.active { background:rgba(31,216,216,0.35); color:#fff; }
+  #loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:#050b18; z-index:10; font-size:16px; color:#4dfcff; }
+  #legend { position:absolute; bottom:16px; left:16px; z-index:5; background:rgba(4,20,26,0.82); border:1px solid #1fd8d8; border-radius:10px; padding:10px 14px; font-size:11px; color:#bdf5f5; box-shadow:0 0 14px rgba(31,216,216,0.25); }
+  #legend .row{ display:flex; align-items:center; margin:2px 0; }
+  #legend .dot2{ width:10px;height:10px;border-radius:50%;margin-right:8px; box-shadow:0 0 6px currentColor; }
+</style>
+</head>
+<body>
+<div id="loading">智慧農場 IoT 場景載入中...</div>
+<div id="canvas-holder"></div>
+
+<div id="panel">
+  <h1>智慧農場 · IoT 監控系統</h1>
+  <div class="sub">SMART FARM DIGITAL TWIN · 示範（讀值為模擬）</div>
+  <div id="live"><span class="dot"></span> LIVE 感測數據同步中</div>
+  <div id="dataFeed">
+    <div><span class="k">S-01 高畦土壤濕度</span><span class="v" id="v1">--</span></div>
+    <div><span class="k">S-02 凹槽含水率</span><span class="v" id="v2">--</span></div>
+    <div><span class="k">S-03 竹筒蚯蚓活性</span><span class="v" id="v3">--</span></div>
+    <div><span class="k">C-01 溫室溫度</span><span class="v" id="v4">--</span></div>
+    <div><span class="k">C-01 溫室濕度</span><span class="v" id="v5">--</span></div>
+    <div><span class="k">W-01 魚塘溶氧</span><span class="v" id="v6">--</span></div>
+    <div><span class="k">WS-01 風速</span><span class="v" id="v7">--</span></div>
+    <div><span class="k">A-01 牧地活動量</span><span class="v" id="v8">--</span></div>
+  </div>
+  <div id="controls-hint">左鍵拖曳：旋轉｜滾輪：縮放｜右鍵拖曳：平移</div>
+</div>
+
+<div id="buttons">
+  <button id="btnTop">俯視圖</button>
+  <button id="btnIso">鳥瞰視角</button>
+  <button id="btnGround">地面視角</button>
+  <button id="btnLabels" class="active">感測標籤 開</button>
+  <button id="btnLinks" class="active">數據連線 開</button>
+</div>
+
+<div id="legend">
+  <div class="row"><span class="dot2" style="color:#4dfcff;background:#4dfcff"></span>IoT 感測節點</div>
+  <div class="row"><span class="dot2" style="color:#ffd24d;background:#ffd24d"></span>建築物照明</div>
+  <div class="row"><span class="dot2" style="color:#ff5a5a;background:#ff5a5a"></span>中控閘道器</div>
+  <div class="row"><span class="dot2" style="color:#b8f5a0;background:#b8f5a0"></span>草本生態循環農園</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+  var holder = document.getElementById('canvas-holder');
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050b18);
+  scene.fog = new THREE.Fog(0x050b18, 70, 230);
+
+  var camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(60, 55, 80);
+
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  holder.appendChild(renderer.domElement);
+
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 8;
+  controls.maxDistance = 220;
+  controls.target.set(0, 2, 0);
+
+  // ---------- Lights (night / tech mood) ----------
+  var hemi = new THREE.HemisphereLight(0x2a4a6a, 0x0a1a12, 0.55);
+  scene.add(hemi);
+  var moon = new THREE.DirectionalLight(0xaacfff, 0.55);
+  moon.position.set(-40, 90, -20);
+  moon.castShadow = true;
+  moon.shadow.mapSize.set(2048, 2048);
+  moon.shadow.camera.left = -70; moon.shadow.camera.right = 70;
+  moon.shadow.camera.top = 70; moon.shadow.camera.bottom = -70;
+  moon.shadow.camera.far = 250;
+  scene.add(moon);
+  scene.add(new THREE.AmbientLight(0x8899bb, 0.28));
+
+  // ---------- Stars ----------
+  (function(){
+    var starGeo = new THREE.BufferGeometry();
+    var count = 1200;
+    var pos = new Float32Array(count*3);
+    for(var i=0;i<count;i++){
+      var r = 200 + Math.random()*150;
+      var theta = Math.random()*Math.PI*2;
+      var phi = Math.random()*Math.PI*0.5;
+      pos[i*3] = r*Math.cos(theta)*Math.cos(phi);
+      pos[i*3+1] = Math.abs(r*Math.sin(phi)) + 20;
+      pos[i*3+2] = r*Math.sin(theta)*Math.cos(phi);
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    var starMat = new THREE.PointsMaterial({ color:0xbfe0ff, size:1.1, transparent:true, opacity:0.8 });
+    scene.add(new THREE.Points(starGeo, starMat));
+  })();
+
+  // ---------- Ground ----------
+  var groundMat = new THREE.MeshLambertMaterial({ color: 0x233a2a });
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(140,120,1,1), groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  var gridHelper = new THREE.GridHelper(140, 70, 0x1fd8d8, 0x123a3a);
+  gridHelper.position.y = 0.03;
+  gridHelper.material.transparent = true;
+  gridHelper.material.opacity = 0.35;
+  scene.add(gridHelper);
+
+  // ---------- Helpers ----------
+  function box(w,h,d,color,opts){
+    opts = opts || {};
+    var mat = new THREE.MeshStandardMaterial({ color: color, roughness: opts.roughness!==undefined?opts.roughness:0.85, metalness: opts.metalness||0, transparent: !!opts.transparent, opacity: opts.opacity!==undefined?opts.opacity:1, emissive: opts.emissive||0x000000, emissiveIntensity: opts.emissiveIntensity||0 });
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  }
+  function plane(w,d,color,opts){
+    opts = opts || {};
+    var mat = new THREE.MeshStandardMaterial({ color: color, roughness:0.9, transparent: !!opts.transparent, opacity: opts.opacity!==undefined?opts.opacity:1, side: THREE.DoubleSide });
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), mat);
+    m.rotation.x = -Math.PI/2;
+    m.receiveShadow = true;
+    return m;
+  }
+  function gableRoof(width, depth, height, color){
+    var geo = new THREE.CylinderGeometry(0, 1, 1, 3, 1);
+    geo.rotateZ(Math.PI/2);
+    var m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: color, roughness:0.7 }));
+    m.scale.set(height, width, depth);
+    m.rotation.x = Math.PI/2;
+    m.castShadow = true;
+    return m;
+  }
+  function windowLight(w,h,x,y,z,ry){
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshStandardMaterial({ color:0xffd24d, emissive:0xffb020, emissiveIntensity:1.4, side:THREE.DoubleSide }));
+    m.position.set(x,y,z);
+    m.rotation.y = ry||0;
+    scene.add(m);
+  }
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  function makeLabel(text, glow){
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    var fontSize = 40;
+    ctx.font = 'bold ' + fontSize + 'px Consolas,"Microsoft JhengHei",monospace';
+    var w = ctx.measureText(text).width + 40;
+    canvas.width = w; canvas.height = fontSize + 24;
+    ctx.font = 'bold ' + fontSize + 'px Consolas,"Microsoft JhengHei",monospace';
+    ctx.fillStyle = 'rgba(4,20,26,0.75)';
+    roundRect(ctx,0,0,canvas.width,canvas.height,16); ctx.fill();
+    ctx.strokeStyle = glow||'#4dfcff'; ctx.lineWidth = 3;
+    roundRect(ctx,2,2,canvas.width-4,canvas.height-4,14); ctx.stroke();
+    ctx.fillStyle = glow||'#4dfcff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 20, canvas.height/2);
+    var tex = new THREE.CanvasTexture(canvas);
+    var mat = new THREE.SpriteMaterial({ map: tex, depthTest:false, transparent:true });
+    var sprite = new THREE.Sprite(mat);
+    var scale = 0.026;
+    sprite.scale.set(canvas.width*scale, canvas.height*scale, 1);
+    return sprite;
+  }
+
+  var labelGroup = new THREE.Group(); scene.add(labelGroup);
+  var sensorGroup = new THREE.Group(); scene.add(sensorGroup);
+  var linkGroup = new THREE.Group(); scene.add(linkGroup);
+  var sensors = [];
+
+  function addLabel(text, x, y, z, color){
+    var s = makeLabel(text, color); s.position.set(x,y,z); labelGroup.add(s);
+  }
+
+  // ================= Perimeter fence =================
+  var fenceMat = new THREE.MeshStandardMaterial({ color:0x4a3a28, roughness:0.9 });
+  var fenceMinX=-43, fenceMaxX=43, fenceMinZ=-36, fenceMaxZ=36;
+  function addFencePosts(x1,z1,x2,z2){
+    var dx = x2-x1, dz = z2-z1;
+    var len = Math.sqrt(dx*dx+dz*dz);
+    var steps = Math.round(len/4);
+    for(var i=0;i<=steps;i++){
+      var t = i/steps;
+      var post = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,1.6,6), fenceMat);
+      post.position.set(x1+dx*t,0.8,z1+dz*t);
+      post.castShadow = true;
+      scene.add(post);
+    }
+    var rail1 = new THREE.Mesh(new THREE.BoxGeometry(len,0.12,0.12), fenceMat);
+    var rail2 = rail1.clone();
+    var angle = Math.atan2(dz,dx);
+    rail1.position.set((x1+x2)/2,1.1,(z1+z2)/2); rail1.rotation.y = -angle;
+    rail2.position.set((x1+x2)/2,0.6,(z1+z2)/2); rail2.rotation.y = -angle;
+    scene.add(rail1, rail2);
+  }
+  addFencePosts(fenceMinX,fenceMinZ,fenceMaxX,fenceMinZ);
+  addFencePosts(fenceMaxX,fenceMinZ,fenceMaxX,fenceMaxZ);
+  addFencePosts(fenceMaxX,fenceMaxZ,fenceMinX,fenceMaxZ);
+  addFencePosts(fenceMinX,fenceMaxZ,fenceMinX,fenceMinZ);
+
+  var gate = box(6,2.2,0.3, 0x0a1a1a, { emissive:0x1fd8d8, emissiveIntensity:0.4 });
+  gate.position.set(1, 1.1, fenceMaxZ);
+  scene.add(gate);
+  addLabel('大門 / RFID門禁', 1, 4, fenceMaxZ+2);
+
+  // ================= Roads =================
+  var roadMat = new THREE.MeshStandardMaterial({ color:0x1c2a24, roughness:1 });
+  function roadSegment(x1,z1,x2,z2,width){
+    var dx=x2-x1, dz=z2-z1, len=Math.sqrt(dx*dx+dz*dz);
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(width,len), roadMat);
+    m.rotation.x = -Math.PI/2;
+    m.position.set((x1+x2)/2, 0.02, (z1+z2)/2);
+    m.rotation.z = -Math.atan2(dz,dx) + Math.PI/2;
+    m.receiveShadow = true;
+    scene.add(m);
+  }
+  roadSegment(1,36, 1,20, 4);
+  roadSegment(1,20, -19,20, 4);
+  roadSegment(-19,20, -19,-12, 4);
+  roadSegment(-19,20, 21,20, 4);
+  roadSegment(21,20, 21,-2, 4);
+
+  // ================= Residential (farmhouse) =================
+  (function(){
+    var base = box(14,6,11, 0x3a3428);
+    base.position.set(-27, 3, 1.5);
+    scene.add(base);
+    var roof = gableRoof(14, 11.5, 4.5, 0x6a2a22);
+    roof.position.set(-27, 6.6, 1.5);
+    scene.add(roof);
+    windowLight(2.4,1.8,-20.1,3,-1.5,Math.PI/2);
+    windowLight(2.4,1.8,-20.1,3,4,Math.PI/2);
+    addLabel('住宅區', -27, 10.5, 1.5, '#8ff0cc');
+
+    var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,4,6), new THREE.MeshStandardMaterial({ color:0x888 }));
+    mast.position.set(-27, 10.6, 1.5); scene.add(mast);
+    sensorNodeAt(-27, 12.6, 1.5, 'WS-01 氣象站');
+  })();
+
+  // ================= Barn + silo =================
+  (function(){
+    var base = box(14,8,10, 0x5a2a20);
+    base.position.set(-27, 4, 13);
+    scene.add(base);
+    var roof = gableRoof(14, 11, 5, 0x3a1a14);
+    roof.position.set(-27, 8.6, 13); scene.add(roof);
+    windowLight(2.2,1.6,-20.1,4,10,Math.PI/2);
+    addLabel('穀倉 / 畜舍', -27, 12, 13, '#ffbf94');
+    sensorNodeAt(-27, 8.6, 8.2, 'R-01 RFID門禁');
+
+    var silo = new THREE.Mesh(new THREE.CylinderGeometry(3,3,10,20), new THREE.MeshStandardMaterial({ color:0x9aa4ac, metalness:0.5, roughness:0.35 }));
+    silo.position.set(-18, 5, 13); silo.castShadow = true; scene.add(silo);
+    var dome = new THREE.Mesh(new THREE.SphereGeometry(3,20,12,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({ color:0x828c94, metalness:0.5, roughness:0.35 }));
+    dome.position.set(-18, 10, 13); scene.add(dome);
+    addLabel('穀倉筒倉', -18, 13.5, 13, '#cfe6ee');
+    sensorNodeAt(-18, 11, 13, 'L-01 穀位計');
+  })();
+
+  // ================= Greenhouse =================
+  (function(){
+    var glass = box(12,4,8, 0x2a4a4a, { transparent:true, opacity:0.4, emissive:0x1c3a3a, emissiveIntensity:0.3 });
+    glass.position.set(-27, 2, -9); scene.add(glass);
+    var roof = gableRoof(12, 8.5, 3, 0x2a4a4a);
+    roof.material.transparent = true; roof.material.opacity = 0.45;
+    roof.position.set(-27, 4.3, -9); scene.add(roof);
+    addLabel('溫室', -27, 6.5, -9, '#8ff5f5');
+    sensorNodeAt(-27, 4.6, -9, 'C-01 環控感測');
+  })();
+
+  // ================= Equipment shed =================
+  (function(){
+    var base = box(14,5,7, 0x4a4438);
+    base.position.set(-27, 2.5, 23.5); scene.add(base);
+    var roof = gableRoof(14, 7.5, 2.6, 0x38342a);
+    roof.position.set(-27, 5.3, 23.5); scene.add(roof);
+    addLabel('機具倉庫', -27, 7.5, 23.5, '#eae08a');
+    sensorNodeAt(-27, 5.6, 23.5, 'T-01 設備追蹤');
+  })();
+
+  // ================= 草本生態循環農園 × 2（依配置圖，兩座併排，八種草本） =================
+  // 面積對齊原三塊農田：18×20 + 18×20 + 38×15 = 1,290 m²
+  // → 每座 25.4 × 25.4 m（645 m²），兩座併排共 1,290 m²
+  // 外圍口字型 + 中央十字：皆為匍伏百里香
+  // 每兩列植物之間的凹槽：一整排竹筒 + 一整排三葉白花草
+  var GARDEN = { cx: 9.5, cz: -18, size: 25.4, gap: 1.5 };
+  (function herbGardens(){
+    var S = GARDEN.size, H = S/2;
+    var THYME_W = 1.4;    // 匍伏百里香圍籬寬
+    var CROSS_W = 2.0;    // 中央十字寬（匍伏百里香，可踏）
+    var BED_W   = 1.2;    // 高畦寬
+    var BED_H   = 0.30;   // 高畦高
+    var FURROW  = 0.50;   // 凹槽寬
+    var N_BED   = 5;      // 每區高畦條數
+    var TUBE_SP = 1.10;   // 竹筒間距
+    var CLV_SP  = 0.36;   // 三葉白花草株距
+
+    var innerHalf = H - THYME_W;
+    var qOff      = CROSS_W/2;
+    var quadW     = innerHalf - qOff;
+    var margin    = (quadW - (N_BED*BED_W + (N_BED-1)*FURROW)) / 2;
+    var zMargin   = 0.7;
+    var bedLen    = quadW - zMargin*2;
+
+    // ---- 共用材質 ----
+    var thymeMat   = new THREE.MeshStandardMaterial({ color:0x2c4626, roughness:0.95 });
+    var bedSoilMat = new THREE.MeshStandardMaterial({ color:0x3a2c1e, roughness:1 });
+    var furrowMat  = new THREE.MeshStandardMaterial({ color:0x1a140e, roughness:1 });
+    var bambooMat  = new THREE.MeshStandardMaterial({ color:0x7a8c3e, roughness:0.7 });
+    var holeMat    = new THREE.MeshStandardMaterial({ color:0x080c06 });
+    var trunkMat   = new THREE.MeshStandardMaterial({ color:0x4a3220, roughness:0.9 });
+    var thymeFlwMat= new THREE.MeshStandardMaterial({ color:0x9a6ec8, emissive:0x6a3fa0, emissiveIntensity:0.7, roughness:0.85 });
+    var clvLeafMat = new THREE.MeshStandardMaterial({ color:0x4f7f3a, roughness:0.95 });
+    var clvFlwMat  = new THREE.MeshStandardMaterial({ color:0xf2f7e8, emissive:0xbfd8a8, emissiveIntensity:0.85, roughness:0.7 });
+
+    // ---- 八種草本 ----
+    // shape: bush 叢生球型 / spike 直立錐型 / grass 叢生放射（香茅）/ tree 小喬木（肉桂）
+    var HERBS_A = [
+      { sx:-1, sz:-1, name:'芳香萬壽菊', shape:'bush',  leaf:0x3f6a2a, flw:0xff8a2a, flwEm:0xff6a00,
+        hh:0.55, cols:3, rowStep:0.55, fRate:0.55, lc:'#ffc07a' },
+      { sx: 1, sz:-1, name:'紫蘇',       shape:'bush',  leaf:0x5a3568, flw:0x9a6ec0, flwEm:0x6a3f8a,
+        hh:0.50, cols:3, rowStep:0.55, fRate:0.25, lc:'#d3a8f0' },
+      { sx:-1, sz: 1, name:'檸檬馬鞭草', shape:'spike', leaf:0x4a7a34, flw:0xcfe8a0, flwEm:0x9ac070,
+        hh:0.70, cols:3, rowStep:0.60, fRate:0.30, lc:'#c8f5a8' },
+      { sx: 1, sz: 1, name:'甜菊',       shape:'bush',  leaf:0x36692c, flw:0xdfeec0, flwEm:0x9ac070,
+        hh:0.45, cols:3, rowStep:0.50, fRate:0.20, lc:'#a8f0b8' }
+    ];
+    var HERBS_B = [
+      { sx:-1, sz:-1, name:'薄荷',       shape:'bush',  leaf:0x49a35a, flw:0xe4ecf8, flwEm:0xa8c0e0,
+        hh:0.42, cols:3, rowStep:0.48, fRate:0.35, lc:'#9ef5b8' },
+      { sx: 1, sz:-1, name:'迷迭香',     shape:'spike', leaf:0x4a6b5e, flw:0x8fb8e8, flwEm:0x5f8fd0,
+        hh:0.75, cols:2, rowStep:0.72, fRate:0.30, lc:'#a8d8f0' },
+      // 肉桂原本在此（sx:-1, sz:1）用高畦種植，v9 改為外圍種植（小喬木根系不適合高畦），
+      // 見下方 plantCinnamonPerimeter()；空出的高畦位置使用者指示改種薄荷。
+      { sx:-1, sz: 1, name:'薄荷',       shape:'bush',  leaf:0x49a35a, flw:0xe4ecf8, flwEm:0xa8c0e0,
+        hh:0.42, cols:3, rowStep:0.48, fRate:0.35, lc:'#9ef5b8' },
+      { sx: 1, sz: 1, name:'檸檬香茅',   shape:'grass', leaf:0x8a9a3a, noFlower:true,
+        hh:1.10, cols:2, rowStep:0.95, fRate:0,    lc:'#eef2a8' }
+    ];
+
+    function herbGeometry(shape){
+      if(shape === 'spike') return new THREE.ConeGeometry(0.5, 1, 6);
+      if(shape === 'grass') return new THREE.CylinderGeometry(0.85, 0.12, 1, 5, 1, true);
+      return new THREE.SphereGeometry(0.5, 7, 6);   // bush
+    }
+
+    // 由座標陣列建立 InstancedMesh
+    function buildInstanced(geo, mat, list, place){
+      if(!list.length) return null;
+      var inst = new THREE.InstancedMesh(geo, mat, list.length);
+      var dummy = new THREE.Object3D();
+      list.forEach(function(p, i){
+        place(dummy, p, i);
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+      scene.add(inst);
+      return inst;
+    }
+
+    // ---------- 原三塊農田範圍改為草生地 ----------
+    var lawn = plane(62, 36, 0x24361d);
+    lawn.position.set(GARDEN.cx, 0.005, GARDEN.cz);
+    scene.add(lawn);
+
+    // ---------- 兩座之間的連通走道（併在一起）----------
+    var link = new THREE.Mesh(new THREE.BoxGeometry(GARDEN.gap, 0.2, S), thymeMat);
+    link.position.set(GARDEN.cx, 0.1, GARDEN.cz);
+    link.receiveShadow = true;
+    scene.add(link);
+
+    function buildGarden(cx, cz, tag, herbs, withSubLabels){
+      var thymeFlwPos = [];   // 百里香花（外圍 + 十字）
+      var tubePos     = [];   // 竹筒
+      var cloverPos   = [];   // 三葉白花草
+
+      // ---- 土壤基座 ----
+      var soilBase = plane(S, S, 0x2b2118);
+      soilBase.position.set(cx, 0.02, cz);
+      scene.add(soilBase);
+
+      // ---- 外圍：匍伏百里香 口字型圍籬 ----
+      function thymeBand(px, pz, w, d, h){
+        var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), thymeMat);
+        m.position.set(px, h/2, pz);
+        m.castShadow = true; m.receiveShadow = true;
+        scene.add(m);
+      }
+      thymeBand(cx, cz - H + THYME_W/2, S, THYME_W, 0.5);
+      thymeBand(cx, cz + H - THYME_W/2, S, THYME_W, 0.5);
+      thymeBand(cx - H + THYME_W/2, cz, THYME_W, S - THYME_W*2, 0.5);
+      thymeBand(cx + H - THYME_W/2, cz, THYME_W, S - THYME_W*2, 0.5);
+      for(var i=0;i<900;i++){
+        var side = i % 4, u = (Math.random()-0.5), px, pz;
+        if(side===0){ px = cx + u*S; pz = cz - H + THYME_W*Math.random(); }
+        else if(side===1){ px = cx + u*S; pz = cz + H - THYME_W*Math.random(); }
+        else if(side===2){ px = cx - H + THYME_W*Math.random(); pz = cz + u*(S-THYME_W*2); }
+        else { px = cx + H - THYME_W*Math.random(); pz = cz + u*(S-THYME_W*2); }
+        thymeFlwPos.push([px, 0.52, pz]);
+      }
+
+      // ---- 中央十字：同樣是匍伏百里香（低矮可踏）----
+      var innerLen = innerHalf*2, CROSS_H = 0.2;
+      var armA = new THREE.Mesh(new THREE.BoxGeometry(CROSS_W, CROSS_H, innerLen), thymeMat);
+      armA.position.set(cx, CROSS_H/2, cz); armA.receiveShadow = true; armA.castShadow = true;
+      scene.add(armA);
+      var armB = new THREE.Mesh(new THREE.BoxGeometry(innerLen, CROSS_H, CROSS_W), thymeMat);
+      armB.position.set(cx, CROSS_H/2, cz); armB.receiveShadow = true; armB.castShadow = true;
+      scene.add(armB);
+      for(var j=0;j<520;j++){
+        var vertical = (j % 2 === 0);
+        var a = (Math.random()-0.5)*innerLen, b = (Math.random()-0.5)*CROSS_W;
+        thymeFlwPos.push(vertical ? [cx + b, CROSS_H + 0.03, cz + a]
+                                  : [cx + a, CROSS_H + 0.03, cz + b]);
+      }
+
+      // ---- 四區：高畦 / 凹槽（竹筒 + 三葉白花草）/ 植株 ----
+      herbs.forEach(function(h){
+        var plantPos = [], flowerPos = [];
+        var bandZ = cz + h.sz*(qOff + zMargin + bedLen/2);
+
+        for(var b=0; b<N_BED; b++){
+          var offX = qOff + margin + BED_W/2 + b*(BED_W + FURROW);
+          var bx = cx + h.sx*offX;
+          var bed = new THREE.Mesh(new THREE.BoxGeometry(BED_W, BED_H, bedLen), bedSoilMat);
+          bed.position.set(bx, BED_H/2, bandZ);
+          bed.castShadow = true; bed.receiveShadow = true;
+          scene.add(bed);
+
+          var rows = Math.max(2, Math.floor(bedLen/h.rowStep));
+          for(var r=0;r<rows;r++){
+            var pz = bandZ - bedLen/2 + 0.35 + r*(bedLen-0.7)/(rows-1);
+            for(var c=0;c<h.cols;c++){
+              var spread = (h.cols === 1) ? 0 : (c - (h.cols-1)/2) * (BED_W*0.66/(h.cols-1));
+              var px = bx + spread + (Math.random()-0.5)*0.1;
+              plantPos.push([px, pz]);
+              if(!h.noFlower && Math.random() < h.fRate){
+                flowerPos.push([px + (Math.random()-0.5)*0.24, pz + (Math.random()-0.5)*0.24]);
+              }
+            }
+          }
+        }
+
+        // 凹槽：每兩列植物之間一整排竹筒 + 一整排三葉白花草
+        for(var f=0; f<N_BED-1; f++){
+          var offF = qOff + margin + BED_W + FURROW/2 + f*(BED_W + FURROW);
+          var fx = cx + h.sx*offF;
+          var fr = new THREE.Mesh(new THREE.BoxGeometry(FURROW, 0.1, bedLen), furrowMat);
+          fr.position.set(fx, 0.05, bandZ);
+          fr.receiveShadow = true;
+          scene.add(fr);
+
+          var nTube = Math.max(3, Math.round(bedLen/TUBE_SP));
+          for(var t=0;t<nTube;t++){
+            tubePos.push([fx, bandZ - bedLen/2 + bedLen*(t+0.5)/nTube]);
+          }
+          var nClv = Math.max(4, Math.round(bedLen/CLV_SP));
+          for(var k=0;k<nClv;k++){
+            var side = (k % 2 === 0) ? -1 : 1;
+            cloverPos.push([
+              fx + side*(FURROW*0.3) + (Math.random()-0.5)*0.06,
+              bandZ - bedLen/2 + bedLen*(k+0.5)/nClv
+            ]);
+          }
+        }
+
+        var dummy = new THREE.Object3D();
+
+        if(h.shape === 'tree'){
+          // 肉桂：小喬木（樹幹 + 樹冠）
+          var trunkH = h.hh*0.5, canopyR = h.hh*0.30;
+          var tInst = new THREE.InstancedMesh(
+            new THREE.CylinderGeometry(0.055, 0.085, 1, 6), trunkMat, plantPos.length);
+          var cInst = new THREE.InstancedMesh(
+            new THREE.SphereGeometry(1, 8, 7),
+            new THREE.MeshStandardMaterial({ color:h.leaf, roughness:0.95 }), plantPos.length);
+          plantPos.forEach(function(p, i){
+            var s = 0.85 + Math.random()*0.35;
+            dummy.position.set(p[0], BED_H + trunkH*s/2, p[1]);
+            dummy.scale.set(1, trunkH*s, 1);
+            dummy.rotation.set(0,0,0);
+            dummy.updateMatrix(); tInst.setMatrixAt(i, dummy.matrix);
+
+            dummy.position.set(p[0], BED_H + trunkH*s + canopyR*s*0.75, p[1]);
+            dummy.scale.set(canopyR*s, canopyR*s*1.15, canopyR*s);
+            dummy.rotation.set(0, Math.random()*Math.PI, 0);
+            dummy.updateMatrix(); cInst.setMatrixAt(i, dummy.matrix);
+          });
+          tInst.instanceMatrix.needsUpdate = true;
+          cInst.instanceMatrix.needsUpdate = true;
+          tInst.castShadow = true; cInst.castShadow = true;
+          scene.add(tInst, cInst);
+        } else {
+          var wide = (h.shape === 'grass') ? 0.30 : (h.shape === 'spike' ? 0.30 : 0.34);
+          var pInst = buildInstanced(
+            herbGeometry(h.shape),
+            new THREE.MeshStandardMaterial({ color:h.leaf, roughness:0.95 }),
+            plantPos,
+            function(d, p){
+              var s = 0.82 + Math.random()*0.4;
+              d.position.set(p[0], BED_H + h.hh*s/2, p[1]);
+              d.scale.set(wide*s, h.hh*s, wide*s);
+              d.rotation.set(
+                (h.shape === 'grass') ? (Math.random()-0.5)*0.18 : 0,
+                Math.random()*Math.PI,
+                (h.shape === 'grass') ? (Math.random()-0.5)*0.18 : 0);
+            });
+          if(pInst) pInst.castShadow = true;
+        }
+
+        // 花
+        buildInstanced(
+          new THREE.SphereGeometry(0.06, 5, 4),
+          new THREE.MeshStandardMaterial({ color:h.flw||0xffffff, emissive:h.flwEm||0x000000,
+            emissiveIntensity:0.9, roughness:0.8 }),
+          flowerPos,
+          function(d, p){
+            var s = 0.75 + Math.random()*0.6;
+            d.position.set(p[0], BED_H + h.hh + 0.06, p[1]);
+            d.scale.set(s,s,s);
+            d.rotation.set(0,0,0);
+          });
+      });
+
+      // ---- 竹筒（整排）----
+      buildInstanced(
+        new THREE.CylinderGeometry(0.06, 0.06, 1.0, 8), bambooMat, tubePos,
+        function(d, p){ d.position.set(p[0], -0.40, p[1]); d.scale.set(1,1,1); d.rotation.set(0,0,0); }
+      );
+      buildInstanced(
+        new THREE.CylinderGeometry(0.045, 0.045, 0.02, 8), holeMat, tubePos,
+        function(d, p){ d.position.set(p[0], 0.11, p[1]); d.scale.set(1,1,1); d.rotation.set(0,0,0); }
+      );
+
+      // ---- 三葉白花草（整排，畦間綠肥）----
+      buildInstanced(
+        new THREE.SphereGeometry(0.09, 5, 4), clvLeafMat, cloverPos,
+        function(d, p){
+          var s = 0.8 + Math.random()*0.5;
+          d.position.set(p[0], 0.10, p[1]);
+          d.scale.set(s, s*0.6, s);
+          d.rotation.set(0, Math.random()*Math.PI, 0);
+        });
+      buildInstanced(
+        new THREE.SphereGeometry(0.05, 6, 5), clvFlwMat, cloverPos,
+        function(d, p){
+          var s = 0.7 + Math.random()*0.5;
+          d.position.set(p[0], 0.19, p[1]);
+          d.scale.set(s,s,s);
+          d.rotation.set(0,0,0);
+        });
+
+      // ---- 百里香花（外圍 + 十字）----
+      buildInstanced(
+        new THREE.SphereGeometry(0.07, 5, 4), thymeFlwMat, thymeFlwPos,
+        function(d, p){
+          var s = 0.7 + Math.random()*0.7;
+          d.position.set(p[0], p[1], p[2]);
+          d.scale.set(s,s,s);
+          d.rotation.set(0, Math.random()*Math.PI, 0);
+        });
+
+      // ---- 標籤 ----
+      addLabel('草本生態循環農園 ' + tag, cx, 7.0, cz, '#b8f5a0');
+      herbs.forEach(function(h){
+        addLabel(h.name, cx + h.sx*(qOff + quadW/2), 2.6, cz + h.sz*(qOff + quadW/2), h.lc);
+      });
+      if(withSubLabels){
+        addLabel('十字走道：匍伏百里香', cx, 4.2, cz, '#c9a8f0');
+        addLabel('外圍：匍伏百里香（天然驅蚊）', cx, 1.9, cz + H + 1.6, '#c9a8f0');
+        addLabel('畦間：竹筒 + 三葉白花草', cx, 1.9, cz - H - 1.6, '#eaf5d8');
+      }
+    }
+
+    var half = (S + GARDEN.gap) / 2;
+    buildGarden(GARDEN.cx - half, GARDEN.cz, 'A', HERBS_A, true);
+    buildGarden(GARDEN.cx + half, GARDEN.cz, 'B', HERBS_B, false);
+
+    // ---------- 肉桂改外圍種植（小喬木根系不適合高畦，沿園區 B 外緣種一排）----------
+    (function plantCinnamonPerimeter(){
+      var bx = GARDEN.cx + half, bz = GARDEN.cz;      // 園區 B 中心
+      var edgeZ = bz + H + THYME_W + 1.0;             // 貼在外圍百里香圍籬外側
+      var n = 9, span = S - 2.0;
+      var hh = 1.70, trunkH = hh*0.5, canopyR = hh*0.30;
+      var leafMat = new THREE.MeshStandardMaterial({ color:0x2f5a34, roughness:0.95 });
+      var tInst = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.055,0.085,1,6), trunkMat, n);
+      var cInst = new THREE.InstancedMesh(new THREE.SphereGeometry(1,8,7), leafMat, n);
+      var dummy = new THREE.Object3D();
+      for(var i=0;i<n;i++){
+        var px = bx - span/2 + span*i/(n-1) + (Math.random()-0.5)*0.3;
+        var pz = edgeZ + (Math.random()-0.5)*0.4;
+        var s = 0.85 + Math.random()*0.35;
+
+        dummy.position.set(px, trunkH*s/2, pz);
+        dummy.scale.set(1, trunkH*s, 1);
+        dummy.rotation.set(0,0,0);
+        dummy.updateMatrix(); tInst.setMatrixAt(i, dummy.matrix);
+
+        dummy.position.set(px, trunkH*s + canopyR*s*0.75, pz);
+        dummy.scale.set(canopyR*s, canopyR*s*1.15, canopyR*s);
+        dummy.rotation.set(0, Math.random()*Math.PI, 0);
+        dummy.updateMatrix(); cInst.setMatrixAt(i, dummy.matrix);
+      }
+      tInst.instanceMatrix.needsUpdate = true;
+      cInst.instanceMatrix.needsUpdate = true;
+      tInst.castShadow = true; cInst.castShadow = true;
+      scene.add(tInst, cInst);
+      addLabel('肉桂（外圍種植，小喬木不適合高畦）', bx, 2.6, edgeZ, '#d8b48c');
+    })();
+
+    // ---------- IoT 感測節點 ----------
+    sensorNodeAt(GARDEN.cx - half - 8.5, 1.2, GARDEN.cz - 8.5, 'S-01 高畦土壤濕度');
+    sensorNodeAt(GARDEN.cx + half + 8.5, 1.2, GARDEN.cz + 8.5, 'S-02 凹槽含水率');
+    sensorNodeAt(GARDEN.cx, 1.2, GARDEN.cz + H + 2.6, 'S-03 竹筒蚯蚓活性');
+  })();
+
+  // ================= Orchard =================
+  (function(){
+    var base = plane(22, 18, 0x2c4020);
+    base.position.set(-4, 0.01, 14); scene.add(base);
+    var rows=4, cols=5;
+    for(var r=0;r<rows;r++){
+      for(var c=0;c<cols;c++){
+        var tx = -4 - 11 + 2 + c*(18/(cols-1));
+        var tz = 14 - 9 + 2 + r*(14/(rows-1));
+        var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.3,1.6,6), new THREE.MeshStandardMaterial({ color:0x4a3220 }));
+        trunk.position.set(tx,0.8,tz); trunk.castShadow = true; scene.add(trunk);
+        var leaves = new THREE.Mesh(new THREE.SphereGeometry(1.4,10,8), new THREE.MeshStandardMaterial({ color:0x2f5a1e, roughness:0.9 }));
+        leaves.position.set(tx,2.2,tz); leaves.castShadow = true; scene.add(leaves);
+      }
+    }
+    addLabel('果園', -4, 5, 14, '#b0f0b0');
+  })();
+
+  // ---- drone above orchard ----
+  var drone = new THREE.Group();
+  (function(){
+    var body = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.3,1.2), new THREE.MeshStandardMaterial({ color:0x222831, emissive:0x111820 }));
+    body.castShadow = true; drone.add(body);
+    var lightBottom = new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8), new THREE.MeshStandardMaterial({ color:0xff3030, emissive:0xff3030, emissiveIntensity:2 }));
+    lightBottom.position.set(0,-0.2,0); drone.add(lightBottom);
+    var armGeo = new THREE.BoxGeometry(1.8,0.08,0.08);
+    for(var i=0;i<2;i++){
+      var arm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color:0x333 }));
+      arm.rotation.y = i*Math.PI/2 + Math.PI/4;
+      drone.add(arm);
+    }
+    drone.rotorMeshes = [];
+    var rotorPositions = [[0.9,0.9],[0.9,-0.9],[-0.9,0.9],[-0.9,-0.9]];
+    rotorPositions.forEach(function(p){
+      var rotor = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.04,0.12), new THREE.MeshStandardMaterial({ color:0x111, emissive:0x4dfcff, emissiveIntensity:0.15 }));
+      rotor.position.set(p[0],0.1,p[1]);
+      drone.add(rotor);
+      drone.rotorMeshes.push(rotor);
+    });
+    scene.add(drone);
+    addLabel('D-01 無人機巡田', -4, 11.5, 14, '#4dfcff');
+  })();
+
+  // ================= Pasture with sheep =================
+  var sheepList = [];
+  (function(){
+    var base = plane(14, 11, 0x3a3a20);
+    base.position.set(17, 0.01, 9.5); scene.add(base);
+    addLabel('放牧草地', 17, 3, 9.5, '#eae08a');
+    sensorNodeAt(17, 1.2, 9.5, 'A-01 動物耳標基站');
+
+    function sheep(x,z){
+      var g = new THREE.Group();
+      var body = new THREE.Mesh(new THREE.SphereGeometry(0.8,10,8), new THREE.MeshStandardMaterial({ color:0xcfd0c8 }));
+      body.position.set(0,0.9,0); body.scale.set(1,0.85,1.3); body.castShadow = true;
+      var head = new THREE.Mesh(new THREE.SphereGeometry(0.35,8,8), new THREE.MeshStandardMaterial({ color:0x3a342c }));
+      head.position.set(0,0.9,0.9); head.castShadow = true;
+      var collar = new THREE.Mesh(new THREE.SphereGeometry(0.06,6,6), new THREE.MeshStandardMaterial({ color:0x4dfcff, emissive:0x4dfcff, emissiveIntensity:2 }));
+      collar.position.set(0,0.7,0.65);
+      g.add(body,head,collar);
+      for(var i=0;i<4;i++){
+        var leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.6,6), new THREE.MeshStandardMaterial({ color:0x2a2620 }));
+        leg.position.set((i%2===0?-0.4:0.4), 0.3, (i<2?-0.5:0.5));
+        g.add(leg);
+      }
+      g.position.set(x,0,z); g.rotation.y = Math.random()*Math.PI*2;
+      scene.add(g);
+      sheepList.push(collar);
+    }
+    sheep(13,7); sheep(15,11); sheep(20,8); sheep(18,12); sheep(21,11);
+  })();
+
+  // ================= Pond =================
+  var pondBuoy;
+  (function(){
+    var pond = new THREE.Mesh(new THREE.CircleGeometry(1,40), new THREE.MeshStandardMaterial({ color:0x0f3a4a, roughness:0.1, metalness:0.4, transparent:true, opacity:0.92 }));
+    pond.rotation.x = -Math.PI/2; pond.scale.set(9,6.5,1); pond.position.set(23,0.03,16);
+    pond.receiveShadow = true; scene.add(pond);
+    addLabel('魚塘', 23, 3, 16, '#a8dcff');
+
+    pondBuoy = new THREE.Group();
+    var floatBody = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.4,10), new THREE.MeshStandardMaterial({ color:0xffcc33 }));
+    var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.4,6), new THREE.MeshStandardMaterial({ color:0x888 }));
+    pole.position.y = 0.9;
+    pondBuoy.add(floatBody, pole);
+    pondBuoy.position.set(23, 0.2, 16);
+    scene.add(pondBuoy);
+    sensorNodeAt(23, 1.9, 16, 'W-01 水質浮標');
+    window.__pond = pond;
+  })();
+
+  // ================= Scattered decorative trees =================
+  function decoTree(x,z,s){
+    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.28,1.4,6), new THREE.MeshStandardMaterial({ color:0x4a3220 }));
+    trunk.position.set(x,0.7,z); trunk.castShadow=true;
+    var leaves = new THREE.Mesh(new THREE.ConeGeometry(1.1,2.6,8), new THREE.MeshStandardMaterial({ color:0x2a4a1e }));
+    leaves.position.set(x,2.3,z); leaves.castShadow=true;
+    leaves.scale.set(s,s,s); trunk.scale.set(s,s,s);
+    scene.add(trunk,leaves);
+  }
+  [[-40,-30],[-40,-10],[-40,10],[-40,28],[38,-30],[38,-10],[35,25],[38,32],[-2,32],[-16,32]].forEach(function(p){ decoTree(p[0],p[1], 0.8+Math.random()*0.5); });
+
+  // ================= IoT Gateway Tower =================
+  var GATEWAY = { x:-14, y:14, z:27 };
+  (function(){
+    var pad = new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.2,0.3,16), new THREE.MeshStandardMaterial({ color:0x1a2a2a }));
+    pad.position.set(GATEWAY.x, 0.15, GATEWAY.z); scene.add(pad);
+
+    var poleMat = new THREE.MeshStandardMaterial({ color:0x556, metalness:0.6, roughness:0.4 });
+    var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.5,GATEWAY.y,10), poleMat);
+    pole.position.set(GATEWAY.x, GATEWAY.y/2, GATEWAY.z);
+    pole.castShadow = true; scene.add(pole);
+
+    for(var i=1;i<5;i++){
+      var brace = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.12,0.12), poleMat);
+      brace.position.set(GATEWAY.x, i*(GATEWAY.y/5), GATEWAY.z);
+      brace.rotation.y = i*0.6;
+      scene.add(brace);
+    }
+    var dish = new THREE.Mesh(new THREE.TorusGeometry(1.2,0.12,8,20), new THREE.MeshStandardMaterial({ color:0xccd, metalness:0.7, roughness:0.3 }));
+    dish.position.set(GATEWAY.x, GATEWAY.y+0.5, GATEWAY.z);
+    dish.rotation.x = Math.PI/2.2;
+    scene.add(dish);
+
+    var beaconMat = new THREE.MeshStandardMaterial({ color:0xff3030, emissive:0xff2020, emissiveIntensity:2 });
+    var beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35,10,10), beaconMat);
+    beacon.position.set(GATEWAY.x, GATEWAY.y+1.4, GATEWAY.z);
+    scene.add(beacon);
+    window.__beacon = beacon;
+
+    var beaconLight = new THREE.PointLight(0xff3030, 1.2, 25);
+    beaconLight.position.copy(beacon.position);
+    scene.add(beaconLight);
+
+    addLabel('IoT 中控閘道器 GATEWAY', GATEWAY.x, GATEWAY.y+3.4, GATEWAY.z, '#ff8080');
+
+    // pulsing signal rings
+    window.__signalRings = [];
+    for(var r=0;r<3;r++){
+      var ring = new THREE.Mesh(new THREE.RingGeometry(0.5,0.7,32), new THREE.MeshBasicMaterial({ color:0x4dfcff, transparent:true, opacity:0.5, side:THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI/2;
+      ring.position.set(GATEWAY.x, 0.1, GATEWAY.z);
+      scene.add(ring);
+      window.__signalRings.push({ mesh:ring, offset:r/3 });
+    }
+  })();
+
+  // ================= Sensor nodes + data link system =================
+  function sensorNodeAt(x,y,z,label){
+    var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,y,6), new THREE.MeshStandardMaterial({ color:0x777 }));
+    pole.position.set(x,y/2,z);
+    sensorGroup.add(pole);
+    var nodeMat = new THREE.MeshStandardMaterial({ color:0x0a2a2a, emissive:0x4dfcff, emissiveIntensity:1.6 });
+    var node = new THREE.Mesh(new THREE.SphereGeometry(0.28,10,10), nodeMat);
+    node.position.set(x,y,z);
+    sensorGroup.add(node);
+    if(label) addLabel(label, x, y+1.4, z, '#4dfcff');
+    sensors.push({ x:x, y:y, z:z, mesh:node, phase:Math.random()*Math.PI*2 });
+  }
+
+  // build curved data-link lines + traveling packets
+  var packets = [];
+  sensors.forEach(function(s, i){
+    var start = new THREE.Vector3(s.x, s.y, s.z);
+    var end = new THREE.Vector3(GATEWAY.x, GATEWAY.y*0.7, GATEWAY.z);
+    var mid = new THREE.Vector3((start.x+end.x)/2, Math.max(start.y,end.y)+4, (start.z+end.z)/2);
+    var curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+    var pts = curve.getPoints(24);
+    var geo = new THREE.BufferGeometry().setFromPoints(pts);
+    var mat = new THREE.LineBasicMaterial({ color:0x4dfcff, transparent:true, opacity:0.35 });
+    var line = new THREE.Line(geo, mat);
+    linkGroup.add(line);
+
+    var packet = new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8), new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x4dfcff, emissiveIntensity:2 }));
+    linkGroup.add(packet);
+    packets.push({ curve:curve, mesh:packet, speed:0.15+Math.random()*0.1, offset:Math.random() });
+  });
+
+  // ================= Camera presets =================
+  function flyTo(pos, target){
+    camera.position.set(pos.x,pos.y,pos.z);
+    controls.target.set(target.x,target.y,target.z);
+    controls.update();
+  }
+  document.getElementById('btnTop').onclick = function(){ flyTo({x:0.1,y:130,z:0.1}, {x:0,y:0,z:0}); };
+  document.getElementById('btnIso').onclick = function(){ flyTo({x:60,y:55,z:80}, {x:0,y:2,z:0}); };
+  document.getElementById('btnGround').onclick = function(){ flyTo({x:-20,y:3,z:30}, {x:0,y:2,z:-10}); };
+
+  var labelsVisible = true;
+  document.getElementById('btnLabels').onclick = function(e){
+    labelsVisible = !labelsVisible;
+    labelGroup.visible = labelsVisible;
+    e.target.textContent = '感測標籤 ' + (labelsVisible?'開':'關');
+    e.target.classList.toggle('active', labelsVisible);
+  };
+  var linksVisible = true;
+  document.getElementById('btnLinks').onclick = function(e){
+    linksVisible = !linksVisible;
+    linkGroup.visible = linksVisible;
+    sensorGroup.visible = linksVisible;
+    e.target.textContent = '數據連線 ' + (linksVisible?'開':'關');
+    e.target.classList.toggle('active', linksVisible);
+  };
+
+  // ================= Live data feed simulation =================
+  function rnd(min,max,dec){ return (min+Math.random()*(max-min)).toFixed(dec===undefined?1:dec); }
+  function updateFeed(){
+    document.getElementById('v1').textContent = rnd(48,72,0)+'%';
+    document.getElementById('v2').textContent = rnd(30,55,0)+'%';
+    document.getElementById('v3').textContent = rnd(62,94,0)+'%';
+    document.getElementById('v4').textContent = rnd(22,31,1)+'°C';
+    document.getElementById('v5').textContent = rnd(55,78,0)+'%';
+    document.getElementById('v6').textContent = rnd(5.5,7.8,1)+'mg/L';
+    document.getElementById('v7').textContent = rnd(1,14,1)+'m/s';
+    document.getElementById('v8').textContent = Math.random()>0.15 ? '正常' : '偵測到異常活動';
+  }
+  updateFeed();
+  setInterval(updateFeed, 3000);
+
+  // ================= Resize =================
+  window.addEventListener('resize', function(){
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  document.getElementById('loading').style.display = 'none';
+
+  var clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    var t = clock.getElapsedTime();
+
+    if(window.__pond){ window.__pond.material.opacity = 0.85 + Math.sin(t*0.6)*0.05; }
+    if(window.__beacon){
+      var pulse = 1.5 + Math.sin(t*3)*0.8;
+      window.__beacon.material.emissiveIntensity = Math.max(0.6,pulse);
+    }
+    if(window.__signalRings){
+      window.__signalRings.forEach(function(r){
+        var tt = ((t*0.25)+r.offset) % 1;
+        var s = 1 + tt*14;
+        r.mesh.scale.set(s,s,s);
+        r.mesh.material.opacity = 0.5*(1-tt);
+      });
+    }
+    sensors.forEach(function(s){
+      var glow = 1.2 + Math.sin(t*2.2 + s.phase)*0.6;
+      s.mesh.material.emissiveIntensity = glow;
+    });
+    packets.forEach(function(p){
+      var tt = ((t*p.speed)+p.offset) % 1;
+      var pos = p.curve.getPointAt(tt);
+      p.mesh.position.copy(pos);
+    });
+    sheepList.forEach(function(collar){
+      collar.material.emissiveIntensity = 1.4 + Math.sin(t*3)*0.8;
+    });
+
+    // drone hover + circle over orchard
+    var droneR = 9, droneSpeed = 0.15;
+    drone.position.set(-4 + Math.cos(t*droneSpeed)*droneR, 8 + Math.sin(t*1.5)*0.3, 14 + Math.sin(t*droneSpeed)*droneR*0.7);
+    drone.rotation.y = -t*droneSpeed + Math.PI/2;
+    drone.rotorMeshes.forEach(function(r){ r.rotation.y += 1.2; });
+
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+<a href="../" style="position:fixed;right:12px;bottom:12px;z-index:60;background:rgba(5,11,22,.88);border:1px solid #3987e5;border-radius:999px;padding:5px 12px;color:#eaf2ff;font:13px system-ui,sans-serif;text-decoration:none">← 回戰情中心 <span style="color:#fab219">· 示範</span></a></body>
+</html>

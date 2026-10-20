@@ -1,0 +1,781 @@
+<title>2D 轉 3D 換件示範</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0c1a29;
+    --bg-panel:#13263c;
+    --bg-panel-soft:#0f2033;
+    --line:#274863;
+    --line-soft:#1a3349;
+    --text:#eaf1f7;
+    --text-muted:#8fa9c2;
+    --accent:#d7a75c;
+    --accent-strong:#f0c383;
+    --accent-soft:rgba(215,167,92,0.16);
+    --ok:#7fc8a9;
+    --ok-soft:rgba(127,200,169,0.12);
+    --warn:#e6b45c;
+    --warn-soft:rgba(230,180,92,0.12);
+    --tag-bg:rgba(12,26,41,0.86);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans','Noto Sans TC','Microsoft JhengHei',system-ui,sans-serif;
+    overflow:hidden;
+    background-image:
+      repeating-linear-gradient(0deg, var(--line-soft) 0px, var(--line-soft) 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(90deg, var(--line-soft) 0px, var(--line-soft) 1px, transparent 1px, transparent 40px);
+  }
+  [hidden]{display:none!important;}
+
+  #canvas-wrap{position:fixed; inset:0; z-index:0;}
+  canvas{display:block; width:100%; height:100%; touch-action:none; cursor:grab;}
+  canvas:active{cursor:grabbing;}
+
+  #labels{position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden;}
+  .tag{position:absolute; left:0; top:0; display:flex; align-items:center; gap:6px; white-space:nowrap; opacity:0; will-change:transform,opacity;}
+  .tag i{flex:none; width:7px; height:7px; border-radius:50%; background:var(--accent-strong); box-shadow:0 0 0 3px rgba(215,167,92,0.28);}
+  .tag span{font:500 11px/1 'IBM Plex Sans','Noto Sans TC',sans-serif; color:var(--text); background:var(--tag-bg); border:1px solid var(--line); border-radius:2px; padding:4px 6px;}
+
+  #ui{
+    position:fixed; inset:0; z-index:5;
+    padding:calc(18px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,320px);
+    grid-template-rows:auto minmax(0,1fr) auto;
+    gap:14px;
+    pointer-events:none;
+  }
+  #ui > *{pointer-events:auto;}
+
+  .panel{background:linear-gradient(180deg, var(--bg-panel), var(--bg-panel-soft)); border:1px solid var(--line); border-radius:3px;}
+  .eyebrow{font:500 11px/1 'IBM Plex Mono',monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin:0 0 6px;}
+
+  .titleblock{grid-column:1; grid-row:1; align-self:start; justify-self:start; padding:12px 16px; max-width:460px;}
+  .titleblock h1{font-family:'Big Shoulders Display',sans-serif; font-weight:700; font-size:clamp(22px,4vw,30px); line-height:1; margin:0 0 6px; text-wrap:balance;}
+  .titleblock p{margin:0 0 10px; font-size:12.5px; line-height:1.55; color:var(--text-muted);}
+  .specs{display:grid; grid-template-columns:auto 1fr; gap:2px 14px; margin:0; font:400 11px/1.75 'IBM Plex Mono','Noto Sans TC',monospace; color:var(--text-muted);}
+  .specs dd{margin:0; color:var(--text); font-variant-numeric:tabular-nums;}
+
+  .swap{grid-column:2; grid-row:1 / 3; align-self:start; max-height:100%; min-height:0; overflow:auto; padding:12px 14px 10px;}
+  .status{font-size:12px; line-height:1.5; padding:7px 9px; border:1px solid var(--line); border-radius:3px; margin:0 0 4px;}
+  .status[data-kind="preset"]{border-color:rgba(127,200,169,0.45); background:var(--ok-soft); color:var(--ok);}
+  .status[data-kind="mix"]{border-color:rgba(230,180,92,0.45); background:var(--warn-soft); color:var(--warn);}
+  .status ul{margin:4px 0 0; padding-left:16px;}
+  .slot{display:grid; gap:6px; padding:10px 0 2px; border-top:1px solid var(--line-soft); margin-top:8px;}
+  .slot h3{margin:0; display:flex; justify-content:space-between; align-items:baseline; gap:8px; font:600 12.5px/1.3 'IBM Plex Sans','Noto Sans TC',sans-serif;}
+  .slot h3 small{font:400 10.5px/1.3 'IBM Plex Mono','Noto Sans TC',monospace; color:var(--warn);}
+  .opts{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+  button.opt{
+    appearance:none; text-align:left; cursor:pointer;
+    display:grid; gap:3px; align-content:start;
+    background:var(--bg-panel-soft); color:var(--text-muted);
+    border:1px solid var(--line); border-radius:3px; padding:7px 9px;
+    font:400 12px/1.35 'IBM Plex Sans','Noto Sans TC',sans-serif;
+    transition:border-color .15s, background .15s;
+  }
+  button.opt .m{font:500 9.5px/1 'IBM Plex Mono',monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted);}
+  button.opt b{font-weight:500; color:var(--text);}
+  button.opt code{font:400 10.5px/1.3 'IBM Plex Mono',monospace; color:var(--text-muted); overflow-wrap:anywhere;}
+  button.opt:hover{border-color:var(--accent);}
+  button.opt:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  button.opt[aria-pressed="true"]{border-color:var(--accent); background:var(--accent-soft);}
+  button.opt[aria-pressed="true"] b, button.opt[aria-pressed="true"] .m{color:var(--accent-strong);}
+  .foot{margin:12px 0 0; font:400 10.5px/1.6 'IBM Plex Mono','Noto Sans TC',monospace; color:var(--text-muted);}
+
+  .controls{grid-column:1; grid-row:3; align-self:end; justify-self:start; max-width:100%; display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px;}
+  .panel-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; cursor:move; user-select:none; touch-action:none;}
+  .info{cursor:move; touch-action:none;}
+  .info h2, .info .pn, .info .note{cursor:auto;}
+  button.fold{
+    appearance:none; flex:none; cursor:pointer;
+    border:1px solid var(--line); border-radius:3px; background:transparent; color:var(--text-muted);
+    font:500 11px/1 'IBM Plex Sans','Noto Sans TC',sans-serif; padding:6px 9px;
+  }
+  button.fold:hover{color:var(--text); border-color:var(--accent);}
+  button.fold:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  button.fold[aria-expanded="false"]{color:var(--accent-strong); border-color:rgba(215,167,92,0.5);}
+  #title-body{margin-top:2px;}
+  .group{display:flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; background:var(--bg-panel-soft); width:max-content; max-width:100%;}
+  .group.primary{border-color:var(--accent);}
+  button.seg{
+    appearance:none; border:0; background:transparent; color:var(--text-muted);
+    font:500 12px/1 'IBM Plex Sans','Noto Sans TC',sans-serif;
+    padding:9px 13px; cursor:pointer; border-right:1px solid var(--line); white-space:nowrap;
+    transition:background .15s, color .15s;
+  }
+  .group.primary button.seg{padding:11px 16px; font-size:13px; border-right-color:var(--accent);}
+  button.seg:last-child{border-right:0;}
+  button.seg:hover{color:var(--text);}
+  button.seg:focus-visible{outline:2px solid var(--accent); outline-offset:-2px;}
+  button.seg[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent-strong);}
+  .hint{flex-basis:100%; font:400 11px/1.5 'IBM Plex Mono','Noto Sans TC',monospace; color:var(--text-muted); opacity:.8; margin:0;}
+
+  .info{grid-column:2; grid-row:3; align-self:end; padding:12px 14px; position:relative;}
+  .info h2{margin:0 26px 2px 0; font:600 15px/1.35 'IBM Plex Sans','Noto Sans TC',sans-serif; text-wrap:balance;}
+  .info .en{margin:0 0 8px; font:400 10.5px/1.4 'IBM Plex Mono',monospace; color:var(--text-muted);}
+  .info .pn{display:inline-block; margin:0 0 8px; font:500 13px/1 'IBM Plex Mono',monospace; color:var(--accent-strong); background:var(--accent-soft); border:1px solid rgba(215,167,92,0.4); border-radius:2px; padding:5px 7px;}
+  .info .meta{margin:0 0 6px; font-size:11.5px; color:var(--text-muted);}
+  .info .note{margin:0; font-size:12px; line-height:1.55;}
+  .info .est{margin:6px 0 0; font-size:11px; color:var(--warn);}
+  .info button.close{position:absolute; top:6px; right:6px; appearance:none; border:0; background:transparent; color:var(--text-muted); font-size:18px; line-height:1; width:28px; height:28px; cursor:pointer; border-radius:3px;}
+  .info button.close:hover{color:var(--text);}
+  .info button.close:focus-visible{outline:2px solid var(--accent);}
+
+  @media (max-width: 760px){
+    #ui{grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) auto auto; gap:10px; padding-left:16px; padding-right:16px;}
+    .titleblock{grid-column:1; grid-row:1; max-width:100%; padding:10px 12px;}
+    .controls{grid-column:1; grid-row:2; align-self:start;}
+    .hint{display:none;}
+    .info{grid-column:1; grid-row:4;}
+    .swap{grid-column:1; grid-row:5; max-height:36vh;}
+    .tag span{font-size:10px; padding:3px 5px;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    button.seg, button.opt{transition:none;}
+  }
+</style>
+
+<div id="canvas-wrap"></div>
+<div id="labels"></div>
+
+<div id="ui">
+  <section class="titleblock panel" aria-labelledby="model-name">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">服務爆炸圖 → 零件抽換 · 示範 v5</p>
+        <h1 id="model-name">示範機型 B</h1>
+      </div>
+      <button class="fold" id="fold-title" type="button" aria-expanded="true" aria-controls="title-body">收合</button>
+    </div>
+    <div id="title-body">
+    <p>機型 A 與機型 B 外殼共用同料號，差在面板控制、鍋爐、蒸氣管、幫浦與主控板。可整台切換，也可單獨抽換零件比較。</p>
+    <dl class="specs">
+      <dt>外型</dt><dd>26 × 53 × 57.5 cm（兩台相同）</dd>
+      <dt>鍋爐</dt><dd id="spec-boiler">—</dd>
+      <dt>加熱管</dt><dd id="spec-heater">—</dd>
+      <dt>控制</dt><dd id="spec-control">—</dd>
+    </dl>
+    </div>
+  </section>
+
+  <aside class="swap panel" aria-label="抽換零件">
+    <div class="panel-head">
+      <p class="eyebrow">抽換零件</p>
+      <button class="fold" id="fold-swap" type="button" aria-expanded="true" aria-controls="swap-body">收合</button>
+    </div>
+    <div class="status" id="mix-status" data-kind="preset" role="status"></div>
+    <div id="swap-body">
+      <div id="slots"></div>
+      <p class="foot">料號為示範編號。外型與面板位置依規格圖；內部零件的尺寸與位置為示意。</p>
+    </div>
+  </aside>
+
+  <div class="controls">
+    <div class="group primary" role="group" aria-label="機型">
+      <button class="seg" id="model-SWN" aria-pressed="false">機型 A</button>
+      <button class="seg" id="model-SWS" aria-pressed="true">機型 B</button>
+    </div>
+    <div class="group" role="group" aria-label="外殼">
+      <button class="seg" id="shell-solid" aria-pressed="false">外殼</button>
+      <button class="seg" id="shell-ghost" aria-pressed="true">透明</button>
+      <button class="seg" id="shell-hide" aria-pressed="false">隱藏</button>
+    </div>
+    <div class="group" role="group" aria-label="零件">
+      <button class="seg" id="btn-assemble" aria-pressed="true">組合</button>
+      <button class="seg" id="btn-explode" aria-pressed="false">拆解</button>
+    </div>
+    <div class="group" role="group" aria-label="視角">
+      <button class="seg" id="view-iso" aria-pressed="true">立體</button>
+      <button class="seg" id="view-front" aria-pressed="false">正視</button>
+      <button class="seg" id="view-side" aria-pressed="false">側視</button>
+      <button class="seg" id="view-back" aria-pressed="false">背面</button>
+      <button class="seg" id="btn-rotate" aria-pressed="true">自動旋轉</button>
+    </div>
+    <p class="hint">拖曳旋轉・滾輪縮放・點零件看料號・文字框可拖曳移動（雙擊標題列復位）</p>
+  </div>
+
+  <section class="info panel" id="info" hidden aria-live="polite">
+    <button class="close" id="info-close" aria-label="關閉零件資訊">×</button>
+    <h2 id="info-zh"></h2>
+    <p class="en" id="info-en"></p>
+    <span class="pn" id="info-pn"></span>
+    <p class="meta" id="info-meta"></p>
+    <p class="note" id="info-note"></p>
+    <p class="est" id="info-est" hidden>內部零件：尺寸與位置為示意，非實際量測。</p>
+  </section>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var DATA = {"dims": {"W": 26.0, "H": 53.0, "D": 57.5}, "profile": [[52.247, 52.721], [52.247, 33.892], [41.883, 33.892], [41.599, 33.613], [41.457, 7.253], [57.5, 7.253], [57.358, 0.139], [38.049, 0.0], [37.481, 1.813], [13.914, 1.953], [11.5, 2.371], [7.667, 2.371], [6.531, 1.813], [6.389, 0.697], [4.827, 0.697], [4.401, 2.65], [0.0, 2.789], [0.0, 5.858], [3.123, 5.858], [3.407, 6.276], [4.117, 53.0]], "parts": [{"id": "topCover", "zh": "上蓋板", "en": "TOP COVER PLATE", "pn": "DP-0001", "pieces": [{"kind": "box", "min": [-12.9, 52.6, 0.5], "max": [12.9, 53.0, 52.0], "mat": "shell"}], "slot": null, "opt": null, "offset": [0, 20, 0], "label": "上蓋板", "internal": false, "note": "", "shell": true}, {"id": "rearCover", "zh": "後蓋", "en": "REAR COVER", "pn": "DP-0002", "pieces": [{"kind": "prismX", "poly": [[0, 2.5], [41.5, 2.5], [41.5, 33.8], [52.2, 33.8], [52.2, 52.6], [0, 52.6]], "x0": 12.7, "x1": 13.0, "mat": "shell"}, {"kind": "prismX", "poly": [[0, 2.5], [41.5, 2.5], [41.5, 33.8], [52.2, 33.8], [52.2, 52.6], [0, 52.6]], "x0": -13.0, "x1": -12.7, "mat": "shell"}, {"kind": "box", "min": [-12.7, 2.5, 0.0], "max": [12.7, 52.6, 0.3], "mat": "shell"}], "slot": null, "opt": null, "offset": [0, 0, -30], "label": "後蓋", "internal": false, "note": "側板與背板一體的 U 型外殼", "shell": true}, {"id": "frontPanel", "zh": "前飾板", "en": "FRONT PANEL", "pn": "DP-0003", "pieces": [{"kind": "box", "min": [-12.7, 2.5, 41.2], "max": [12.7, 33.8, 41.5], "mat": "plate"}], "slot": null, "opt": null, "offset": [0, 0, 10], "label": "前飾板", "internal": false, "note": "", "shell": true}, {"id": "bottomPlate", "zh": "底座", "en": "BOTTOM PLATE", "pn": "DP-0004", "pieces": [{"kind": "box", "min": [-12.9, 1.0, 0.3], "max": [12.9, 2.5, 41.5], "mat": "shell"}], "slot": null, "opt": null, "offset": [0, 0, 0], "label": "底座", "internal": false, "note": "", "shell": false}, {"id": "feet", "zh": "防滑橡膠腳架 ×4", "en": "ANTI-SLIP RUBBER FOOT", "pn": "DP-0005", "pieces": [{"kind": "cylY", "cx": -10.5, "cz": 3.0, "r": 0.9, "y0": 0.0, "y1": 1.0, "mat": "dark", "seg": 16}, {"kind": "cylY", "cx": -10.5, "cz": 38.0, "r": 0.9, "y0": 0.0, "y1": 1.0, "mat": "dark", "seg": 16}, {"kind": "cylY", "cx": 10.5, "cz": 3.0, "r": 0.9, "y0": 0.0, "y1": 1.0, "mat": "dark", "seg": 16}, {"kind": "cylY", "cx": 10.5, "cz": 38.0, "r": 0.9, "y0": 0.0, "y1": 1.0, "mat": "dark", "seg": 16}], "slot": null, "opt": null, "offset": [0, 0, 0], "label": null, "internal": false, "note": "", "shell": false}, {"id": "cableHead", "zh": "短螺紋電纜固定頭 M20×1.5", "en": "SHORT THREAD CABLE FIXING HEAD", "pn": "DP-0006", "pieces": [{"kind": "cylZ", "cx": 9.0, "cy": 6.0, "r": 0.9, "z0": -1.2, "depth": 1.2, "mat": "dark", "seg": 16}], "slot": null, "opt": null, "offset": [0, 0, -8], "label": null, "internal": false, "note": "", "shell": false}, {"id": "dripTray", "zh": "排水槽組", "en": "DRAIN BASIN ASSEMBLY", "pn": "DP-0007", "pieces": [{"kind": "box", "min": [-13.0, 0.0, 41.5], "max": [13.0, 7.1, 57.5], "mat": "dark"}, {"kind": "box", "min": [-12.2, 7.1, 42.3], "max": [12.2, 7.35, 56.7], "mat": "metal"}], "slot": null, "opt": null, "offset": [0, 0, 26], "label": "排水槽組", "internal": false, "note": "", "shell": false}, {"id": "hotWand", "zh": "熱水管總成", "en": "HOT WATER WAND ASSEMBLY", "pn": "DP-0008", "pieces": [{"kind": "cylY", "cx": -4.3, "cz": 47.3, "r": 1.1, "y0": 30.8, "y1": 33.8, "mat": "metal", "seg": 24}, {"kind": "cylY", "cx": -4.3, "cz": 47.3, "r": 0.5, "y0": 23.2, "y1": 30.8, "mat": "metal", "seg": 16}, {"kind": "box", "min": [-6.7, 26.4, 46.1], "max": [-4.85, 30.0, 48.5], "mat": "dark"}, {"kind": "cylY", "cx": -4.3, "cz": 47.3, "r": 1.05, "y0": 20.7, "y1": 23.4, "mat": "metal", "seg": 24}], "slot": null, "opt": null, "offset": [-3, -10, 6], "label": "熱水管", "internal": false, "note": "含熱水管夾 DP-0009、熱水噴頭組 DP-0010；兩台共用", "shell": false}, {"id": "pressSwitch", "zh": "壓力開關 1.0–2.5 bar", "en": "PRESSURE SWITCH 1.0-2.5bar", "pn": "DP-0011", "pieces": [{"kind": "cylY", "cx": -9.0, "cz": 36.0, "r": 1.8, "y0": 46.0, "y1": 49.5, "mat": "dark", "seg": 24}, {"kind": "cylY", "cx": -9.0, "cz": 36.0, "r": 0.4, "y0": 43.0, "y1": 46.0, "mat": "metal", "seg": 12}], "slot": null, "opt": null, "offset": [0, 8, 0], "label": "壓力開關", "internal": true, "note": "兩台共用", "shell": false}, {"id": "panelSWN", "zh": "操作面板組", "en": "OPERATION PANEL ASSEMBLY", "pn": "DP-0012", "pieces": [{"kind": "box", "min": [-12.7, 33.8, 51.9], "max": [12.7, 52.6, 52.2], "mat": "plate"}, {"kind": "box", "min": [-12.7, 33.8, 41.5], "max": [12.7, 34.1, 51.9], "mat": "plate"}], "slot": "panel", "opt": "SWN", "offset": [0, 0, 16], "label": "操作面板組", "internal": false, "note": "", "shell": true}, {"id": "gaugeSWN", "zh": "氣壓錶", "en": "STEAM PRESSURE GAUGE", "pn": "DP-0013", "pieces": [{"kind": "cylZ", "cx": 0.0, "cy": 47.6, "r": 3.1, "z0": 52.2, "depth": 2.11, "mat": "metal", "seg": 32}, {"kind": "cylZ", "cx": 0.0, "cy": 47.6, "r": 2.542, "z0": 54.31, "depth": 0.3, "mat": "face", "seg": 32}], "slot": "panel", "opt": "SWN", "offset": [0, 0, 24], "label": "氣壓錶", "internal": false, "note": "兩台共用同料號，位置不同", "shell": false}, {"id": "switchSWN", "zh": "主電源開關（三段式）20A", "en": "MAIN POWER SWITCH (3 STAGES) 20A", "pn": "DP-0014", "pieces": [{"kind": "box", "min": [-2.6, 37.6, 52.2], "max": [2.6, 42.8, 52.6], "mat": "plate"}, {"kind": "cylZ", "cx": 0.0, "cy": 40.2, "r": 1.2, "z0": 52.6, "depth": 2.01, "mat": "dark", "seg": 32}], "slot": "panel", "opt": "SWN", "offset": [0, 0, 22], "label": "主電源開關", "internal": false, "note": "含電源開關護套 DP-0015；兩台共用同料號", "shell": false}, {"id": "knobHotSWN", "zh": "蒸氣熱水總成（黑）", "en": "STEAM/WATER KNOB ASSEMBLY (BLACK)", "pn": "DP-0016", "pieces": [{"kind": "cylZ", "cx": -8.3, "cy": 38.4, "r": 2.6, "z0": 52.2, "depth": 2.6, "mat": "dark", "seg": 32}, {"kind": "cylZ", "cx": -8.3, "cy": 38.4, "r": 1.8, "z0": 54.8, "depth": 0.25, "mat": "face", "seg": 32}], "slot": "panel", "opt": "SWN", "offset": [0, 0, 22], "label": "熱水旋鈕", "internal": false, "note": "含旋鈕蓋-熱水 DP-0017", "shell": false}, {"id": "knobSteamSWN", "zh": "蒸氣熱水總成（黑）", "en": "STEAM/WATER KNOB ASSEMBLY (BLACK)", "pn": "DP-0016", "pieces": [{"kind": "cylZ", "cx": 5.5, "cy": 38.4, "r": 2.6, "z0": 52.2, "depth": 2.6, "mat": "dark", "seg": 32}, {"kind": "cylZ", "cx": 5.5, "cy": 38.4, "r": 1.8, "z0": 54.8, "depth": 0.25, "mat": "face", "seg": 32}], "slot": "panel", "opt": "SWN", "offset": [0, 0, 22], "label": "蒸氣旋鈕", "internal": false, "note": "含旋鈕蓋-蒸氣 DP-0018", "shell": false}, {"id": "valvesSWN", "zh": "蒸氣熱水閥旋桿組 ×2", "en": "STEAM/WATER VALVE SPINDLE UNIT", "pn": "DP-0019", "pieces": [{"kind": "cylZ", "cx": -8.3, "cy": 38.4, "r": 0.9, "z0": 44.2, "depth": 7.7, "mat": "metal", "seg": 16}, {"kind": "cylZ", "cx": 5.5, "cy": 38.4, "r": 0.9, "z0": 44.2, "depth": 7.7, "mat": "metal", "seg": 16}, {"kind": "box", "min": [-5.8, 34.1, 45.8], "max": [-2.8, 37.3, 48.8], "mat": "brass"}, {"kind": "box", "min": [3.8, 34.1, 45.8], "max": [6.8, 37.3, 48.8], "mat": "brass"}], "slot": "panel", "opt": "SWN", "offset": [0, 5, 4], "label": "閥旋桿組", "internal": true, "note": "含蒸氣熱水閥基座 DP-0020", "shell": false}, {"id": "lightSWN", "zh": "進水指示燈電線", "en": "INLET INDICATOR LIGHT WIRING ASSEMBLY", "pn": "DP-0021", "pieces": [{"kind": "cylZ", "cx": -10.4, "cy": 50.2, "r": 0.6, "z0": 52.2, "depth": 0.5, "mat": "metal", "seg": 16}], "slot": "panel", "opt": "SWN", "offset": [0, 0, 22], "label": null, "internal": false, "note": "", "shell": false}, {"id": "solenoidSWN", "zh": "電磁閥 2/2 110V~120V", "en": "SOLENOID VALVE 2/2 110V~120V", "pn": "DP-0022", "pieces": [{"kind": "box", "min": [-11.5, 2.5, 24.0], "max": [-7.5, 6.5, 28.0], "mat": "dark"}], "slot": "panel", "opt": "SWN", "offset": [-12, 0, 0], "label": "電磁閥", "internal": true, "note": "", "shell": false}, {"id": "panelSWS", "zh": "操作面板組", "en": "OPERATION PANEL ASSEMBLY", "pn": "DP-0023", "pieces": [{"kind": "box", "min": [-12.7, 33.8, 51.9], "max": [12.7, 52.6, 52.2], "mat": "plate"}, {"kind": "box", "min": [-12.7, 33.8, 41.5], "max": [12.7, 34.1, 51.9], "mat": "plate"}], "slot": "panel", "opt": "SWS", "offset": [0, 0, 16], "label": "操作面板組", "internal": false, "note": "", "shell": true}, {"id": "screenSWS", "zh": "4.3\" 觸控面板組", "en": "4.3 INCH TOUCH SCREEN ASSEMBLY", "pn": "DP-0024", "pieces": [{"kind": "prism", "poly": [[-6.857, 50.959], [-6.429, 51.542], [6.143, 51.542], [6.714, 50.667], [6.714, 44.98], [6.0, 43.96], [-6.143, 43.96], [-6.857, 44.98]], "z0": 52.2, "depth": 2.41, "mat": "dark"}, {"kind": "prism", "poly": [[-4.714, 49.792], [-4.429, 50.084], [-2.714, 50.084], [-2.429, 50.375], [4.0, 50.375], [4.286, 50.084], [4.429, 45.709], [4.0, 45.272], [-4.429, 45.418]], "z0": 54.61, "depth": 0.15, "mat": "screen"}, {"kind": "box", "min": [-6.357, 44.46, 49.3], "max": [6.214, 51.042, 51.9], "mat": "dark"}], "slot": "panel", "opt": "SWS", "offset": [0, 0, 24], "label": "觸控面板組", "internal": false, "note": "含觸控板IC盒前蓋 DP-0025、4.3\"觸控面板 DP-0026、觸控IC盒後蓋 DP-0027", "shell": false}, {"id": "gaugeSWS", "zh": "氣壓錶", "en": "STEAM PRESSURE GAUGE", "pn": "DP-0013", "pieces": [{"kind": "cylZ", "cx": 8.429, "cy": 38.745, "r": 3.143, "z0": 52.2, "depth": 2.11, "mat": "metal", "seg": 32}, {"kind": "cylZ", "cx": 8.429, "cy": 38.745, "r": 2.577, "z0": 54.31, "depth": 0.3, "mat": "face", "seg": 32}], "slot": "panel", "opt": "SWS", "offset": [0, 0, 24], "label": "氣壓錶", "internal": false, "note": "兩台共用同料號，位置不同", "shell": false}, {"id": "switchSWS", "zh": "主電源開關（三段式）20A", "en": "MAIN POWER SWITCH (3 STAGES) 20A", "pn": "DP-0014", "pieces": [{"kind": "box", "min": [-12.0, 36.273, 52.2], "max": [-6.857, 41.655, 52.6], "mat": "plate"}, {"kind": "cylZ", "cx": -9.429, "cy": 39.036, "r": 1.286, "z0": 52.6, "depth": 2.01, "mat": "dark", "seg": 32}], "slot": "panel", "opt": "SWS", "offset": [0, 0, 22], "label": "主電源開關", "internal": false, "note": "含電源開關護套 DP-0015；兩台共用同料號", "shell": false}, {"id": "solenoidsSWS", "zh": "電磁閥 2/2 230~240V ×3", "en": "SOLENOID VALVE 2/2 230~240V", "pn": "DP-0028", "pieces": [{"kind": "box", "min": [-6.3, 34.5, 38.5], "max": [-2.3, 38.5, 42.5], "mat": "dark"}, {"kind": "box", "min": [3.3, 34.5, 38.5], "max": [7.3, 38.5, 42.5], "mat": "dark"}, {"kind": "box", "min": [-11.5, 2.5, 24.0], "max": [-7.5, 6.5, 28.0], "mat": "dark"}, {"kind": "box", "min": [-5.8, 34.1, 45.8], "max": [-2.8, 37.3, 48.8], "mat": "brass"}, {"kind": "box", "min": [3.8, 34.1, 45.8], "max": [6.8, 37.3, 48.8], "mat": "brass"}], "slot": "panel", "opt": "SWS", "offset": [-12, 0, 0], "label": "電磁閥 ×3", "internal": true, "note": "含蒸氣熱水閥基座 DP-0020", "shell": false}, {"id": "flowmeterSWS", "zh": "流量計組", "en": "FLOWMETER ASSEMBLY", "pn": "DP-0029", "pieces": [{"kind": "box", "min": [-11.5, 2.5, 17.0], "max": [-8.5, 5.5, 22.0], "mat": "brass"}], "slot": "panel", "opt": "SWS", "offset": [-12, 0, 0], "label": "流量計", "internal": true, "note": "", "shell": false}, {"id": "boilerSWN", "zh": "6 公升鍋爐總組", "en": "6L BOILER ASSEMBLY", "pn": "DP-0030", "pieces": [{"kind": "cylZ", "cx": 0.0, "cy": 20.0, "r": 8.5, "z0": 7.0, "depth": 26.5, "mat": "metal", "seg": 40}, {"kind": "box", "min": [-3.5, 16.5, 33.5], "max": [3.5, 23.5, 34.3], "mat": "brass"}, {"kind": "cylY", "cx": 2.5, "cz": 18.0, "r": 0.5, "y0": 28.5, "y1": 32.0, "mat": "brass", "seg": 12}, {"kind": "cylY", "cx": -3.0, "cz": 14.0, "r": 0.9, "y0": 28.4, "y1": 32.6, "mat": "brass", "seg": 16}], "slot": "boiler", "opt": "SWN", "offset": [0, 0, -14], "label": "6L 鍋爐", "internal": true, "note": "含加熱管 1500W 110V DP-0031（法蘭式）、水位探針組 95L DP-0032、安全閥 DP-0033", "shell": false}, {"id": "bracketSWN", "zh": "鍋爐支架", "en": "BOILER BRACKET", "pn": "DP-0034", "pieces": [{"kind": "box", "min": [-7.0, 2.5, 14.0], "max": [-6.2, 11.5, 26.0], "mat": "metal"}, {"kind": "box", "min": [6.2, 2.5, 14.0], "max": [7.0, 11.5, 26.0], "mat": "metal"}, {"kind": "box", "min": [-6.2, 10.7, 14.0], "max": [6.2, 11.5, 26.0], "mat": "metal"}], "slot": "boiler", "opt": "SWN", "offset": [0, 0, 0], "label": null, "internal": true, "note": "", "shell": false}, {"id": "boilerSteamSWS", "zh": "4L 蒸氣鍋爐組（1 子鍋）1500W", "en": "4L BOILER ASSEMBLY (STEAM)", "pn": "DP-0035", "pieces": [{"kind": "cylZ", "cx": 0.0, "cy": 19.0, "r": 7.5, "z0": 8.0, "depth": 23.0, "mat": "metal", "seg": 40}, {"kind": "cylZ", "cx": 0.0, "cy": 19.0, "r": 1.7, "z0": 31.0, "depth": 1.6, "mat": "brass", "seg": 6}, {"kind": "cylY", "cx": 2.5, "cz": 16.0, "r": 0.45, "y0": 26.5, "y1": 30.0, "mat": "brass", "seg": 12}, {"kind": "cylY", "cx": -2.5, "cz": 12.0, "r": 0.9, "y0": 26.4, "y1": 31.0, "mat": "brass", "seg": 16}], "slot": "boiler", "opt": "SWS", "offset": [0, 0, -14], "label": "4L 蒸氣鍋", "internal": true, "note": "含單預熱鍋爐（深抽四公升）DP-0036、加熱管 1500W DP-0037（旋入式）、水位探針組 115L DP-0038、安全閥 DP-0033", "shell": false}, {"id": "boilerHotSWS", "zh": "4L 熱水鍋爐組 1500W", "en": "4L BOILER ASSEMBLY (HOT WATER)", "pn": "DP-0039", "pieces": [{"kind": "cylZ", "cx": 0.0, "cy": 44.0, "r": 7.5, "z0": 8.0, "depth": 23.0, "mat": "metal", "seg": 40}, {"kind": "cylZ", "cx": 0.0, "cy": 44.0, "r": 1.7, "z0": 31.0, "depth": 1.6, "mat": "brass", "seg": 6}, {"kind": "cylY", "cx": 2.0, "cz": 20.0, "r": 0.3, "y0": 51.5, "y1": 52.4, "mat": "metal", "seg": 10}], "slot": "boiler", "opt": "SWS", "offset": [0, 16, 0], "label": "4L 熱水鍋", "internal": true, "note": "含茶鍋爐（深抽四公升）DP-0040、加熱管 1500W DP-0037、溫度感知棒 K TYPE DP-0041、排氣閥 10bar DP-0042", "shell": false}, {"id": "bracketsSWS", "zh": "鍋爐支架 1 / 鍋爐支架 2", "en": "BOILER BRACKET 1 / 2", "pn": "DP-0043 / DP-0044", "pieces": [{"kind": "box", "min": [-6.0, 2.5, 14.0], "max": [-5.2, 11.5, 26.0], "mat": "metal"}, {"kind": "box", "min": [5.2, 2.5, 14.0], "max": [6.0, 11.5, 26.0], "mat": "metal"}, {"kind": "box", "min": [-5.2, 10.7, 14.0], "max": [5.2, 11.5, 26.0], "mat": "metal"}, {"kind": "box", "min": [-6.0, 34.1, 12.0], "max": [6.0, 36.5, 28.0], "mat": "metal"}], "slot": "boiler", "opt": "SWS", "offset": [0, 0, 0], "label": null, "internal": true, "note": "", "shell": false}, {"id": "steamWandSWN", "zh": "蒸氣管總成", "en": "STEAM WAND ASSEMBLY", "pn": "DP-0045", "pieces": [{"kind": "cylY", "cx": 5.3, "cz": 47.3, "r": 1.1, "y0": 30.8, "y1": 33.8, "mat": "metal", "seg": 24}, {"kind": "tube", "pts": [[5.3, 30.8, 47.3], [5.3, 27.2, 47.3], [5.3, 25.2, 48.9], [5.3, 12.2, 49.3]], "r": 0.45, "mat": "metal"}, {"kind": "box", "min": [3.2, 26.4, 46.6], "max": [7.4, 27.4, 48.0], "mat": "dark"}, {"kind": "cylY", "cx": 5.3, "cz": 49.3, "r": 0.55, "y0": 11.3, "y1": 12.2, "mat": "metal", "seg": 12}], "slot": "steamWand", "opt": "SWN", "offset": [3, -10, 6], "label": "蒸氣管", "internal": false, "note": "含防燙矽膠套 DP-0046、蒸氣噴頭 DP-0047", "shell": false}, {"id": "steamWandSWS", "zh": "感溫式蒸氣管總成", "en": "TEMP. SENSING STEAM WAND ASSEMBLY", "pn": "DP-0048", "pieces": [{"kind": "cylY", "cx": 5.3, "cz": 47.3, "r": 1.1, "y0": 30.8, "y1": 33.8, "mat": "metal", "seg": 24}, {"kind": "tube", "pts": [[5.3, 30.8, 47.3], [5.3, 27.5, 47.3], [5.3, 23.5, 49.3], [5.3, 19.0, 49.8]], "r": 1.0, "mat": "dark"}, {"kind": "tube", "pts": [[5.3, 19.0, 49.8], [5.3, 12.2, 49.8]], "r": 0.45, "mat": "metal"}, {"kind": "tube", "pts": [[6.45, 30.8, 47.6], [6.45, 27.5, 47.7], [6.45, 23.5, 49.7], [6.45, 12.5, 50.2]], "r": 0.12, "mat": "metal"}, {"kind": "cylY", "cx": 5.3, "cz": 49.8, "r": 0.55, "y0": 11.3, "y1": 12.2, "mat": "metal", "seg": 12}], "slot": "steamWand", "opt": "SWS", "offset": [3, -10, 6], "label": "感溫式蒸氣管", "internal": false, "note": "含感溫式蒸氣管包膠 DP-0049、蒸氣噴頭 DP-0047", "shell": false}, {"id": "pumpSWN", "zh": "隔膜幫浦 110V", "en": "DIAPHRAGM PUMP 110V", "pn": "DP-0050", "pieces": [{"kind": "cylZ", "cx": -8.0, "cy": 6.2, "r": 3.4, "z0": 2.0, "depth": 10.0, "mat": "dark", "seg": 32}, {"kind": "cylZ", "cx": -8.0, "cy": 6.2, "r": 3.0, "z0": 12.0, "depth": 1.8, "mat": "metal", "seg": 32}, {"kind": "box", "min": [-11.2, 2.5, 3.0], "max": [-4.8, 2.8, 11.0], "mat": "metal"}], "slot": "pump", "opt": "SWN", "offset": [-14, 0, 0], "label": "幫浦 110V", "internal": true, "note": "檔名註記「認證前，幫浦要改料號」：此料號待更新", "shell": false}, {"id": "pumpSWS", "zh": "隔膜幫浦 220V", "en": "DIAPHRAGM PUMP 220V", "pn": "DP-0051", "pieces": [{"kind": "cylZ", "cx": -8.0, "cy": 6.2, "r": 3.4, "z0": 2.0, "depth": 10.0, "mat": "dark", "seg": 32}, {"kind": "cylZ", "cx": -8.0, "cy": 6.2, "r": 3.0, "z0": 12.0, "depth": 1.8, "mat": "metal", "seg": 32}, {"kind": "box", "min": [-11.2, 2.5, 3.0], "max": [-4.8, 2.8, 11.0], "mat": "metal"}], "slot": "pump", "opt": "SWS", "offset": [-14, 0, 0], "label": "幫浦 220V", "internal": true, "note": "檔名註記「認證前，幫浦要改料號」：此料號待更新", "shell": false}, {"id": "boardSWN", "zh": "主控IC板組－單孔 110V", "en": "MAIN CONTROL IC BOARD ASSEMBLY-1 GROUP 110V", "pn": "DP-0052", "pieces": [{"kind": "box", "min": [9.2, 8.0, 18.0], "max": [12.5, 26.0, 30.0], "mat": "icbox"}], "slot": "board", "opt": "SWN", "offset": [14, 0, 0], "label": "主控板 110V", "internal": true, "note": "含主控IC盒上蓋 DP-0053、下蓋 DP-0054、主控IC板 DP-0055", "shell": false}, {"id": "boardSWS", "zh": "主控IC板組－溫控 220V", "en": "MAIN CONTROL IC BOARD ASSEMBLY-TEMP. CONTROL 220V", "pn": "DP-0056", "pieces": [{"kind": "box", "min": [9.2, 8.0, 18.0], "max": [12.5, 26.0, 30.0], "mat": "icbox"}, {"kind": "box", "min": [9.5, 3.0, 20.0], "max": [12.5, 7.5, 24.5], "mat": "dark"}], "slot": "board", "opt": "SWS", "offset": [14, 0, 0], "label": "主控板 220V", "internal": true, "note": "含主控IC板-溫控220V DP-0057、固態繼電器 SSR 15A DP-0058", "shell": false}], "slots": [{"id": "panel", "zh": "操作面板與控制", "opts": {"SWN": {"name": "旋鈕式（手動閥）", "pn": "DP-0012"}, "SWS": {"name": "觸控螢幕（電磁閥）", "pn": "DP-0023"}}}, {"id": "boiler", "zh": "鍋爐組", "opts": {"SWN": {"name": "6L 單鍋・1500W 110V", "pn": "DP-0030"}, "SWS": {"name": "4L 雙鍋・1500W ×2", "pn": "DP-0035 / DP-0039"}}}, {"id": "steamWand", "zh": "蒸氣管", "opts": {"SWN": {"name": "一般蒸氣管", "pn": "DP-0045"}, "SWS": {"name": "感溫式蒸氣管", "pn": "DP-0048"}}}, {"id": "pump", "zh": "幫浦", "note": "料號待更新（認證前）", "opts": {"SWN": {"name": "隔膜幫浦 110V", "pn": "DP-0050", "volt": 110}, "SWS": {"name": "隔膜幫浦 220V", "pn": "DP-0051", "volt": 220}}}, {"id": "board", "zh": "主控板", "opts": {"SWN": {"name": "單孔 110V", "pn": "DP-0052", "volt": 110}, "SWS": {"name": "溫控 220V + SSR", "pn": "DP-0056", "volt": 220}}}], "models": {"SWN": {"zh": "機型 A", "boiler": "6L ×1", "heater": "1500W 110V ×1", "control": "旋鈕式手動閥"}, "SWS": {"zh": "機型 B", "boiler": "4L ×2", "heater": "1500W ×2", "control": "4.3\" 觸控螢幕"}}, "presets": {"SWN": {"panel": "SWN", "boiler": "SWN", "steamWand": "SWN", "pump": "SWN", "board": "SWN"}, "SWS": {"panel": "SWS", "boiler": "SWS", "steamWand": "SWS", "pump": "SWS", "board": "SWS"}}, "source": "示範資料"};
+  var W = DATA.dims.W, H = DATA.dims.H, D = DATA.dims.D;
+
+  var COLORS = {
+    shell:  { color: 0xa9b4bd, roughness: 0.42, metalness: 0.3 },
+    plate:  { color: 0xc3ccd3, roughness: 0.38, metalness: 0.3 },
+    dark:   { color: 0x161c22, roughness: 0.5,  metalness: 0.1 },
+    metal:  { color: 0xd0d8de, roughness: 0.28, metalness: 0.45 },
+    screen: { color: 0x0b2733, roughness: 0.15, metalness: 0.0, emissive: 0x0e4152 },
+    face:   { color: 0xe4e9ec, roughness: 0.6,  metalness: 0.0 },
+    brass:  { color: 0xb8924f, roughness: 0.35, metalness: 0.55 },
+    icbox:  { color: 0x3a4450, roughness: 0.6,  metalness: 0.05 }
+  };
+  var ACCENT = new THREE.Color(0xd7a75c);
+  var ACCENT_HOT = new THREE.Color(0xffd89a);
+  var GLOW = new THREE.Color(0xf6dcac);
+
+  var wrap = document.getElementById("canvas-wrap");
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x0c1a29, 1);
+  wrap.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(32, 1, 1, 3000);
+  scene.add(new THREE.HemisphereLight(0xcfe3ff, 0x0c1a29, 0.75));
+  var key = new THREE.DirectionalLight(0xfff1dc, 1.7); key.position.set(60, 90, 80); scene.add(key);
+  var fill = new THREE.DirectionalLight(0x7fb0d9, 0.8); fill.position.set(-80, 30, 40); scene.add(fill);
+  var rim = new THREE.DirectionalLight(0xd7a75c, 0.9); rim.position.set(-40, 60, -90); scene.add(rim);
+
+  var root = new THREE.Group();
+  root.position.z = -D / 2;
+  scene.add(root);
+
+  var grid = new THREE.GridHelper(220, 44, 0x35597a, 0x1f3a52);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.5;
+  scene.add(grid);
+
+  var rise = { uRiseY: { value: -10 }, uRiseColor: { value: GLOW.clone() } };
+
+  function makeMaterial(kind) {
+    var c = COLORS[kind] || COLORS.shell;
+    var mat = new THREE.MeshPhysicalMaterial({
+      color: c.color, roughness: c.roughness, metalness: c.metalness,
+      emissive: c.emissive || 0x000000, clearcoat: 0.2
+    });
+    mat.userData.baseEmissive = new THREE.Color(c.emissive || 0x000000);
+    mat.onBeforeCompile = function (shader) {
+      shader.uniforms.uRiseY = rise.uRiseY;
+      shader.uniforms.uRiseColor = rise.uRiseColor;
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying float vWorldY;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWorldY = (modelMatrix * vec4(transformed, 1.0)).y;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uRiseY;\nuniform vec3 uRiseColor;\nvarying float vWorldY;")
+        .replace("#include <dithering_fragment>",
+          "#include <dithering_fragment>\nfloat band = smoothstep(uRiseY - 5.0, uRiseY, vWorldY) - smoothstep(uRiseY, uRiseY + 5.0, vWorldY);\ngl_FragColor.rgb += uRiseColor * band * 0.45;");
+    };
+    return mat;
+  }
+
+  // every piece is baked in machine coordinates, so a part group only ever carries its animation offset
+  function pieceGeometry(pc) {
+    var g;
+    if (pc.kind === "box") {
+      g = new THREE.BoxGeometry(pc.max[0] - pc.min[0], pc.max[1] - pc.min[1], pc.max[2] - pc.min[2]);
+      g.translate((pc.min[0] + pc.max[0]) / 2, (pc.min[1] + pc.max[1]) / 2, (pc.min[2] + pc.max[2]) / 2);
+    } else if (pc.kind === "prism") {
+      g = new THREE.ExtrudeGeometry(new THREE.Shape(pc.poly.map(function (q) { return new THREE.Vector2(q[0], q[1]); })), { depth: pc.depth, bevelEnabled: false });
+      g.translate(0, 0, pc.z0);
+    } else if (pc.kind === "prismX") {
+      g = new THREE.ExtrudeGeometry(new THREE.Shape(pc.poly.map(function (q) { return new THREE.Vector2(q[0], q[1]); })), { depth: pc.x1 - pc.x0, bevelEnabled: false });
+      // shape x (= depth z) -> world z, extrusion -> world -x, then shift into [x0, x1]
+      g.rotateY(-Math.PI / 2);
+      g.translate(pc.x1, 0, 0);
+    } else if (pc.kind === "cylZ") {
+      g = new THREE.CylinderGeometry(pc.r, pc.r, pc.depth, pc.seg || 32);
+      g.rotateX(Math.PI / 2);
+      g.translate(pc.cx, pc.cy, pc.z0 + pc.depth / 2);
+    } else if (pc.kind === "cylY") {
+      g = new THREE.CylinderGeometry(pc.r, pc.r, pc.y1 - pc.y0, pc.seg || 24);
+      g.translate(pc.cx, (pc.y0 + pc.y1) / 2, pc.cz);
+    } else if (pc.kind === "tube") {
+      var path = new THREE.CurvePath();
+      for (var i = 0; i < pc.pts.length - 1; i++) {
+        path.add(new THREE.LineCurve3(new THREE.Vector3().fromArray(pc.pts[i]), new THREE.Vector3().fromArray(pc.pts[i + 1])));
+      }
+      g = new THREE.TubeGeometry(path, pc.pts.length * 12, pc.r, 12, false);
+    }
+    return g;
+  }
+
+  var recs = [], byId = {}, pickables = [];
+
+  DATA.parts.forEach(function (p) {
+    var group = new THREE.Group();
+    var mats = {}, matList = [], edgeMats = [];
+    var box0 = new THREE.Box3();
+    p.pieces.forEach(function (pc) {
+      var geo = pieceGeometry(pc);
+      if (!mats[pc.mat]) { mats[pc.mat] = makeMaterial(pc.mat); matList.push(mats[pc.mat]); }
+      var mesh = new THREE.Mesh(geo, mats[pc.mat]);
+      mesh.userData.partId = p.id;
+      var em = new THREE.LineBasicMaterial({ color: ACCENT.clone(), transparent: true, opacity: 0.45 });
+      edgeMats.push(em);
+      mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), em));
+      group.add(mesh);
+      pickables.push(mesh);
+      geo.computeBoundingBox();
+      box0.union(geo.boundingBox);
+    });
+    root.add(group);
+    var offset = new THREE.Vector3().fromArray(p.offset);
+    var swapDir = offset.lengthSq() > 0 ? offset.clone().normalize().multiplyScalar(12) : new THREE.Vector3(0, 12, 0);
+    var rec = { p: p, group: group, mats: matList, edgeMats: edgeMats, offset: offset, swapDir: swapDir,
+                box0: box0, presence: 1, target: 1, opacity: 1 };
+    recs.push(rec);
+    byId[p.id] = rec;
+  });
+
+  // ---- flowing light along the side profile, both sides ----
+  function densify(loop, n) {
+    var pts = loop.concat([loop[0]]), segs = [], total = 0;
+    for (var i = 0; i < pts.length - 1; i++) {
+      var dx = pts[i + 1][0] - pts[i][0], dy = pts[i + 1][1] - pts[i][1];
+      var len = Math.sqrt(dx * dx + dy * dy); segs.push(len); total += len;
+    }
+    var out = [], idx = 0, acc = 0;
+    for (var k = 0; k < n; k++) {
+      var target = (k / n) * total;
+      while (idx < segs.length - 1 && acc + segs[idx] < target) { acc += segs[idx]; idx++; }
+      var t = segs[idx] > 0 ? (target - acc) / segs[idx] : 0;
+      out.push([pts[idx][0] + (pts[idx + 1][0] - pts[idx][0]) * t, pts[idx][1] + (pts[idx + 1][1] - pts[idx][1]) * t]);
+    }
+    return out;
+  }
+  var PATH_N = 1800, SEG = 90;
+  var profile = densify(DATA.profile, PATH_N);
+  var flyers = [];
+  function makeFlyer(sideX, startFrac) {
+    var geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(SEG * 3), 3));
+    var percent = new Float32Array(SEG);
+    for (var i = 0; i < SEG; i++) percent[i] = Math.sin((i / (SEG - 1)) * Math.PI);
+    geometry.setAttribute("percent", new THREE.BufferAttribute(percent, 1));
+    var material = new THREE.PointsMaterial({ color: GLOW, size: 1.7, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    material.onBeforeCompile = function (shader) {
+      shader.vertexShader = shader.vertexShader
+        .replace("void main() {", "attribute float percent;\nvoid main() {")
+        .replace("gl_PointSize = size;", "gl_PointSize = percent * size;");
+      shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>",
+        "#include <opaque_fragment>\nfloat r = distance(gl_PointCoord, vec2(0.5));\ngl_FragColor.a *= pow(max(1.0 - r / 0.5, 0.0), 2.5);");
+    };
+    var pts = new THREE.Points(geometry, material);
+    pts.frustumCulled = false;
+    root.add(pts);
+    flyers.push({ points: pts, geometry: geometry, x: sideX, index: startFrac * PATH_N });
+  }
+  makeFlyer(W / 2 + 0.08, 0);
+  makeFlyer(-W / 2 - 0.08, 0.5);
+  function updateFlyers(delta, visible) {
+    flyers.forEach(function (f) {
+      f.points.visible = visible;
+      if (!visible) return;
+      f.index = (f.index + 260 * delta) % PATH_N;
+      var start = Math.floor(f.index), pos = f.geometry.attributes.position;
+      for (var i = 0; i < SEG; i++) {
+        var p = profile[(start + i) % PATH_N];
+        pos.setXYZ(i, f.x, p[1], p[0]);
+      }
+      pos.needsUpdate = true;
+    });
+  }
+
+  // ---- name tags (shown while exploded) ----
+  var labelLayer = document.getElementById("labels");
+  var labels = recs.filter(function (r) { return r.p.label; }).map(function (r) {
+    var el = document.createElement("div");
+    el.className = "tag";
+    el.innerHTML = "<i></i><span></span>";
+    el.querySelector("span").textContent = r.p.label;
+    labelLayer.appendChild(el);
+    return { rec: r, el: el };
+  });
+  var tmpBox = new THREE.Box3(), anchor = new THREE.Vector3();
+
+  // ---------------- state ----------------
+  var MODEL_KEYS = ["SWN", "SWS"];
+  var cfg = Object.assign({}, DATA.presets.SWS);
+  var shellMode = "ghost";
+  var SHELL_FACTOR = { solid: 1, ghost: 0.16, hide: 0 };
+  var explodeTarget = 0, mix = 0, autoRotate = true, selected = null;
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var slotById = {};
+  DATA.slots.forEach(function (s) { slotById[s.id] = s; });
+
+  function isActive(p) { return !p.slot || cfg[p.slot] === p.opt; }
+  function presetOf(c) {
+    for (var i = 0; i < MODEL_KEYS.length; i++) {
+      var m = MODEL_KEYS[i], preset = DATA.presets[m], same = true;
+      for (var k in preset) if (preset[k] !== c[k]) same = false;
+      if (same) return m;
+    }
+    return null;
+  }
+
+  // ---------------- swap panel ----------------
+  var slotsEl = document.getElementById("slots");
+  var optButtons = [];
+  DATA.slots.forEach(function (s) {
+    var wrapEl = document.createElement("div");
+    wrapEl.className = "slot";
+    var h = document.createElement("h3");
+    h.textContent = s.zh;
+    if (s.note) { var sm = document.createElement("small"); sm.textContent = s.note; h.appendChild(sm); }
+    wrapEl.appendChild(h);
+    var opts = document.createElement("div");
+    opts.className = "opts";
+    MODEL_KEYS.forEach(function (m) {
+      var o = s.opts[m];
+      var b = document.createElement("button");
+      b.className = "opt";
+      b.type = "button";
+      b.id = "opt-" + s.id + "-" + m;
+      b.dataset.slot = s.id;
+      b.dataset.opt = m;
+      b.innerHTML = '<span class="m"></span><b></b><code></code>';
+      b.querySelector(".m").textContent = DATA.models[m].zh;
+      b.querySelector("b").textContent = o.name;
+      b.querySelector("code").textContent = o.pn;
+      b.addEventListener("click", function () { cfg[s.id] = m; refresh(); });
+      opts.appendChild(b);
+      optButtons.push(b);
+    });
+    wrapEl.appendChild(opts);
+    slotsEl.appendChild(wrapEl);
+  });
+
+  var statusEl = document.getElementById("mix-status");
+  function refresh() {
+    optButtons.forEach(function (b) { b.setAttribute("aria-pressed", String(cfg[b.dataset.slot] === b.dataset.opt)); });
+    var preset = presetOf(cfg);
+    MODEL_KEYS.forEach(function (m) { document.getElementById("model-" + m).setAttribute("aria-pressed", String(preset === m)); });
+
+    statusEl.textContent = "";
+    if (preset) {
+      statusEl.dataset.kind = "preset";
+      statusEl.textContent = "目前是 " + DATA.models[preset].zh + " 標準配置";
+    } else {
+      statusEl.dataset.kind = "mix";
+      statusEl.appendChild(document.createTextNode("混搭配置：不是現有機型，僅供比較零件"));
+      var warns = [];
+      var pv = slotById.pump.opts[cfg.pump].volt, bv = slotById.board.opts[cfg.board].volt;
+      if (pv !== bv) warns.push("幫浦 " + pv + "V 與主控板 " + bv + "V 電壓不同");
+      if (warns.length) {
+        var ul = document.createElement("ul");
+        warns.forEach(function (w) { var li = document.createElement("li"); li.textContent = w; ul.appendChild(li); });
+        statusEl.appendChild(ul);
+      }
+    }
+
+    document.getElementById("model-name").textContent = preset ? "示範" + DATA.models[preset].zh : "示範機型（混搭）";
+    document.getElementById("spec-boiler").textContent = cfg.boiler === "SWN" ? "6L ×1" : "4L ×2（蒸氣＋熱水）";
+    document.getElementById("spec-heater").textContent = cfg.boiler === "SWN" ? "1500W 110V ×1（法蘭式）" : "1500W ×2（旋入式）";
+    document.getElementById("spec-control").textContent = cfg.panel === "SWN" ? "旋鈕式手動閥" : "4.3\" 觸控螢幕＋電磁閥";
+
+    recs.forEach(function (r) { r.target = isActive(r.p) ? 1 : 0; });
+    if (selected && !isActive(selected.p)) select(null);
+  }
+
+  MODEL_KEYS.forEach(function (m) {
+    document.getElementById("model-" + m).addEventListener("click", function () {
+      cfg = Object.assign({}, DATA.presets[m]);
+      refresh();
+    });
+  });
+
+  ["solid", "ghost", "hide"].forEach(function (mode) {
+    document.getElementById("shell-" + mode).addEventListener("click", function () {
+      shellMode = mode;
+      ["solid", "ghost", "hide"].forEach(function (k) { document.getElementById("shell-" + k).setAttribute("aria-pressed", String(k === mode)); });
+      if (selected && selected.p.shell && mode !== "solid") select(null);
+    });
+  });
+
+  var btnAssemble = document.getElementById("btn-assemble"), btnExplode = document.getElementById("btn-explode");
+  function setExploded(on) {
+    explodeTarget = on ? 1 : 0;
+    btnExplode.setAttribute("aria-pressed", String(on));
+    btnAssemble.setAttribute("aria-pressed", String(!on));
+  }
+  btnExplode.addEventListener("click", function () { setExploded(true); });
+  btnAssemble.addEventListener("click", function () { setExploded(false); });
+
+  // ---------------- part info ----------------
+  var info = document.getElementById("info");
+  function select(rec) {
+    if (selected) {
+      selected.mats.forEach(function (m) { m.emissive.copy(m.userData.baseEmissive); });
+      selected.edgeMats.forEach(function (m) { m.color.copy(ACCENT); });
+    }
+    selected = rec;
+    if (!rec) { info.hidden = true; return; }
+    rec.mats.forEach(function (m) { m.emissive.setHex(0x5a3d14); });
+    rec.edgeMats.forEach(function (m) { m.color.copy(ACCENT_HOT); });
+    var p = rec.p;
+    document.getElementById("info-zh").textContent = p.zh;
+    document.getElementById("info-en").textContent = p.en;
+    document.getElementById("info-pn").textContent = p.pn;
+    document.getElementById("info-meta").textContent = p.slot
+      ? slotById[p.slot].zh + "・" + DATA.models[p.opt].zh + " 專用"
+      : "機型 A／B 共用";
+    document.getElementById("info-note").textContent = p.note || "";
+    document.getElementById("info-note").hidden = !p.note;
+    document.getElementById("info-est").hidden = !p.internal;
+    info.hidden = false;
+  }
+  document.getElementById("info-close").addEventListener("click", function () { select(null); });
+  window.addEventListener("keydown", function (ev) { if (ev.key === "Escape") select(null); });
+
+  // ---------------- camera ----------------
+  var VIEWS = {
+    iso:   { theta: 0.78, phi: 1.2 },
+    front: { theta: 0.0, phi: Math.PI / 2 - 0.001 },
+    side:  { theta: Math.PI / 2, phi: Math.PI / 2 - 0.001 },
+    back:  { theta: Math.PI + 0.78, phi: 1.2 }
+  };
+  var view = { theta: VIEWS.iso.theta, phi: VIEWS.iso.phi, dist: 175, target: new THREE.Vector3(0, H / 2, 0) };
+  var zoom = 1, goal = null, fitScale = 5;
+
+  function applyCamera() {
+    var sp = Math.sin(view.phi);
+    camera.position.set(view.target.x + view.dist * sp * Math.sin(view.theta),
+                        view.target.y + view.dist * Math.cos(view.phi),
+                        view.target.z + view.dist * sp * Math.cos(view.theta));
+    camera.lookAt(view.target);
+  }
+  // keep the machine centred in the largest area the UI panels leave uncovered, and size it to fit there
+  var uiEls = [document.querySelector(".titleblock"), document.querySelector(".swap"), document.querySelector(".controls"), info];
+  function rectOf(elm) { return elm && !elm.hidden ? elm.getBoundingClientRect() : null; }
+  function fitView() {
+    var w = wrap.clientWidth, h = wrap.clientHeight, m = 12;
+    var t = rectOf(uiEls[0]), s = rectOf(uiEls[1]), c = rectOf(uiEls[2]), inf = rectOf(uiEls[3]);
+    var cands = [];
+    function add(x0, x1, y0, y1) { if (x1 - x0 > 80 && y1 - y0 > 80) cands.push({ x0: x0, x1: x1, y0: y0, y1: y1 }); }
+    if (w <= 760) {
+      add(0, w, Math.max(t ? t.bottom : 0, c ? c.bottom : 0) + m, Math.min(s ? s.top : h, inf ? inf.top : h) - m);
+    } else {
+      var leftR = Math.max(t ? t.right : 0, c ? c.right : 0);
+      var rightL = Math.min(s ? s.left : w, inf ? inf.left : w);
+      var rightB = s ? s.bottom : 0;
+      var infTop = inf ? inf.top : h;
+      add(leftR + m, rightL - m, m, h - m);
+      add(0, rightL - m, (t ? t.bottom : 0) + m, (c ? c.top : h) - m);
+      add(leftR + m, w, rightB + m, infTop - m);
+      add(0, w, Math.max(t ? t.bottom : 0, rightB) + m, Math.min(c ? c.top : h, infTop) - m);
+    }
+    var best = { x0: 0, x1: w, y0: 0, y1: h }, score = -1;
+    cands.forEach(function (r) {
+      var sc = Math.min(r.x1 - r.x0, r.y1 - r.y0);
+      if (sc > score) { score = sc; best = r; }
+    });
+    var cx = (best.x0 + best.x1) / 2, cy = (best.y0 + best.y1) / 2;
+    camera.setViewOffset(w, h, w / 2 - cx, h / 2 - cy, w, h);
+    fitScale = h / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.max(120, Math.min(best.x1 - best.x0, best.y1 - best.y0)));
+  }
+  var fitQueued = false;
+  function scheduleFit() {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(function () { fitQueued = false; fitView(); });
+  }
+  function resize() {
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    fitView();
+  }
+  window.addEventListener("resize", resize);
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(scheduleFit);
+    uiEls.forEach(function (x) { if (x) ro.observe(x); });
+  }
+
+  function setupFold(btnId, bodyId, open) {
+    var btn = document.getElementById(btnId), body = document.getElementById(bodyId);
+    function apply(o) {
+      body.hidden = !o;
+      btn.setAttribute("aria-expanded", String(o));
+      btn.textContent = o ? "收合" : "展開";
+      scheduleFit();
+    }
+    btn.addEventListener("click", function () { apply(body.hidden); });
+    apply(open);
+  }
+  setupFold("fold-title", "title-body", window.innerWidth >= 1280 && window.innerHeight >= 760);
+  setupFold("fold-swap", "swap-body", window.innerWidth > 760);
+
+  // panels can be dragged out of the way; double-click the header puts one back
+  var drags = [];
+  function makeDraggable(panel, handle) {
+    if (!panel || !handle) return;
+    var st = { x: 0, y: 0 };
+    function clamp() {
+      var r = panel.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+      var x0 = r.left - st.x, y0 = r.top - st.y;
+      st.x = Math.min(Math.max(st.x, 8 - x0), Math.max(8 - x0, vw - 8 - r.width - x0));
+      st.y = Math.min(Math.max(st.y, 8 - y0), Math.max(8 - y0, vh - 8 - r.height - y0));
+      panel.style.transform = "translate(" + st.x.toFixed(1) + "px," + st.y.toFixed(1) + "px)";
+    }
+    st.clamp = clamp;
+    drags.push(st);
+    var dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    handle.addEventListener("pointerdown", function (ev) {
+      if (ev.target.closest("button, a, input, code")) return;
+      dragging = true; sx = ev.clientX; sy = ev.clientY; ox = st.x; oy = st.y;
+      handle.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+    handle.addEventListener("pointermove", function (ev) {
+      if (!dragging) return;
+      st.x = ox + (ev.clientX - sx);
+      st.y = oy + (ev.clientY - sy);
+      clamp();
+      scheduleFit();
+    });
+    function end() { if (dragging) { dragging = false; scheduleFit(); } }
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    handle.addEventListener("dblclick", function () {
+      st.x = 0; st.y = 0;
+      panel.style.transform = "";
+      scheduleFit();
+    });
+  }
+  makeDraggable(uiEls[0], uiEls[0] && uiEls[0].querySelector(".panel-head"));
+  makeDraggable(uiEls[1], uiEls[1] && uiEls[1].querySelector(".panel-head"));
+  makeDraggable(info, info);
+  window.addEventListener("resize", function () { drags.forEach(function (d) { d.clamp(); }); });
+
+  resize();
+
+  var btnRotate = document.getElementById("btn-rotate");
+  var viewBtns = {};
+  Object.keys(VIEWS).forEach(function (k) { viewBtns[k] = document.getElementById("view-" + k); });
+  function setRotate(on) { autoRotate = on; btnRotate.setAttribute("aria-pressed", String(on)); }
+  function markView(name) { Object.keys(viewBtns).forEach(function (k) { viewBtns[k].setAttribute("aria-pressed", String(k === name)); }); }
+  Object.keys(VIEWS).forEach(function (name) {
+    viewBtns[name].addEventListener("click", function () {
+      var t = VIEWS[name], twoPi = Math.PI * 2;
+      goal = { theta: t.theta + Math.round((view.theta - t.theta) / twoPi) * twoPi, phi: t.phi };
+      setRotate(false);
+      markView(name);
+    });
+  });
+  btnRotate.addEventListener("click", function () { setRotate(!autoRotate); if (autoRotate) markView(null); });
+  if (reduceMotion) setRotate(false);
+
+  var el = renderer.domElement, dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
+  el.addEventListener("pointerdown", function (ev) {
+    dragging = true; goal = null;
+    lastX = downX = ev.clientX; lastY = downY = ev.clientY;
+    el.setPointerCapture(ev.pointerId);
+  });
+  el.addEventListener("pointermove", function (ev) {
+    if (!dragging) return;
+    view.theta -= (ev.clientX - lastX) * 0.005;
+    view.phi = Math.min(Math.PI / 2 + 0.35, Math.max(0.25, view.phi - (ev.clientY - lastY) * 0.005));
+    lastX = ev.clientX; lastY = ev.clientY;
+    if (Math.abs(ev.clientX - downX) + Math.abs(ev.clientY - downY) > 5) markView(null);
+  });
+  el.addEventListener("pointercancel", function () { dragging = false; });
+  var raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  el.addEventListener("pointerup", function (ev) {
+    dragging = false;
+    if (Math.abs(ev.clientX - downX) + Math.abs(ev.clientY - downY) > 5) return;
+    var rect = el.getBoundingClientRect();
+    ndc.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(ndc, camera);
+    var hits = raycaster.intersectObjects(pickables, false);
+    for (var i = 0; i < hits.length; i++) {
+      var rec = byId[hits[i].object.userData.partId];
+      if (rec.group.visible && rec.opacity > 0.3) { select(rec); return; }
+    }
+    select(null);
+  });
+  el.addEventListener("wheel", function (ev) {
+    ev.preventDefault();
+    zoom = Math.min(2.6, Math.max(0.4, zoom * (1 + ev.deltaY * 0.001)));
+  }, { passive: false });
+
+  // ---------------- frame loop ----------------
+  function updateLabels(e) {
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+    var fade = Math.max(0, Math.min(1, (e - 0.55) / 0.35));
+    camera.updateMatrixWorld();
+    labels.forEach(function (l) {
+      var r = l.rec;
+      if (fade <= 0 || !r.group.visible || r.presence < 0.6 || r.opacity < 0.3) { l.el.style.opacity = "0"; return; }
+      tmpBox.copy(r.box0).translate(r.group.position);
+      tmpBox.getCenter(anchor);
+      anchor.y = tmpBox.max.y;
+      anchor.add(root.position).project(camera);
+      if (anchor.z > 1 || anchor.z < -1) { l.el.style.opacity = "0"; return; }
+      var x = (anchor.x + 1) / 2 * w, y = (1 - anchor.y) / 2 * h;
+      l.el.style.transform = "translate(" + (x - 3.5).toFixed(1) + "px," + (y - 3.5).toFixed(1) + "px)";
+      l.el.style.opacity = fade.toFixed(3);
+    });
+  }
+
+  var clock = new THREE.Clock();
+  function tick() {
+    var delta = Math.min(clock.getDelta(), 0.05);
+    mix = reduceMotion ? explodeTarget : mix + (explodeTarget - mix) * Math.min(1, delta * 3);
+    var e = mix * mix * (3 - 2 * mix);
+    var shellFactor = SHELL_FACTOR[shellMode];
+
+    recs.forEach(function (r) {
+      r.presence = reduceMotion ? r.target : r.presence + (r.target - r.presence) * Math.min(1, delta * 5);
+      if (Math.abs(r.presence - r.target) < 0.002) r.presence = r.target;
+      r.group.position.copy(r.offset).multiplyScalar(e).addScaledVector(r.swapDir, 1 - r.presence);
+      var op = r.presence * (r.p.shell ? shellFactor : 1);
+      r.opacity = op;
+      var edgeOp = r.presence * (r.p.shell ? (shellMode === "hide" ? 0 : 0.5) : 0.45);
+      r.group.visible = op > 0.01 || edgeOp > 0.01;
+      r.mats.forEach(function (m) {
+        m.opacity = op;
+        m.transparent = op < 0.999;
+        m.depthWrite = op > 0.5;
+        m.visible = op > 0.01;
+      });
+      r.edgeMats.forEach(function (m) { m.opacity = r === selected ? 1 : edgeOp; });
+    });
+
+    if (goal) {
+      var k = Math.min(1, delta * 4);
+      view.theta += (goal.theta - view.theta) * k;
+      view.phi += (goal.phi - view.phi) * k;
+      if (Math.abs(goal.theta - view.theta) < 0.001 && Math.abs(goal.phi - view.phi) < 0.001) goal = null;
+    } else if (autoRotate && !dragging) {
+      view.theta += delta * 0.18;
+    }
+    view.target.z = 6 * e;
+    view.dist = (42 + 22 * e) * fitScale * zoom;
+    applyCamera();
+
+    rise.uRiseY.value = rise.uRiseY.value > H + 12 ? -12 : rise.uRiseY.value + delta * 16;
+    updateFlyers(reduceMotion ? 0 : delta, shellMode !== "hide");
+    updateLabels(e);
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+
+  refresh();
+  recs.forEach(function (r) { r.presence = r.target; });
+  requestAnimationFrame(tick);
+})();
+
+</script>
+<a href="../" style="position:fixed;right:12px;bottom:12px;z-index:60;background:rgba(5,11,22,.88);border:1px solid #3987e5;border-radius:999px;padding:5px 12px;color:#eaf2ff;font:13px system-ui,sans-serif;text-decoration:none">← 回戰情中心 <span style="color:#fab219">· 示範</span></a>

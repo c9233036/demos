@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>海外自動寄件示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.seq{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.seq div{background:var(--surface-2);border:1px solid var(--frame);border-radius:4px;padding:10px;font-size:12px;color:var(--ink-2);}
+.seq div b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px;}
+.seq div .n{font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums;}
+.mail{background:#fbfbf7;color:#1b2a3a;border-radius:4px;padding:12px 14px;font-size:13px;line-height:1.6;}
+.mail .h{color:#56657a;font-size:12px;border-bottom:1px solid #d5dbe3;padding-bottom:6px;margin-bottom:8px;}
+.mail a{color:#2a6cc0;}
+.funnel{display:grid;gap:6px;}
+.funnel .r{display:grid;grid-template-columns:70px 1fr 64px;gap:8px;align-items:center;font-size:12px;}
+@media (max-width:600px){.seq{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1>海外名單自動寄件流程</h1><span class="en">Lead Outreach</span>
+  <span class="tag">示範系統・虛構資料</span>
+  <span class="sp"></span>
+  <button class="btn ghost" id="pause" aria-pressed="false">⏸ 暫停寄送</button>
+</header>
+<main>
+  <div class="grid g4" id="kpis"></div>
+  <section class="panel" style="margin-top:12px">
+    <h2>四封信序列（未回覆才寄下一封）</h2>
+    <div class="seq" id="seq"></div>
+  </section>
+
+  <div class="grid g2" style="margin-top:12px">
+    <section class="panel">
+      <h2>VIP 待審信件（人工核准才寄）</h2>
+      <div class="tw"><table>
+        <thead><tr><th>收件商家</th><th>第幾封</th><th></th></tr></thead>
+        <tbody id="queue"></tbody>
+      </table></div>
+      <p class="note" style="margin-top:6px">點商家名稱預覽信件；預覽裡的連結已失效處理，預覽不會被算成點擊。</p>
+      <div id="prev" style="margin-top:8px"></div>
+    </section>
+    <div class="grid" style="align-content:start">
+      <section class="panel">
+        <h2>成效漏斗</h2>
+        <div class="funnel" id="funnel"></div>
+      </section>
+      <section class="panel">
+        <h2>寄信節流（每次／每日上限）</h2>
+        <div class="tw"><table><thead><tr><th>類別</th><th>每次</th><th>每日</th><th>今日已寄</th></tr></thead><tbody id="thr"></tbody></table></div>
+        <div class="toolbar" style="margin-top:8px"><button class="btn" id="tick">執行一次排程（模擬）</button></div>
+        <ul class="log" id="log"></ul>
+      </section>
+    </div>
+  </div>
+</main>
+<p class="foot">本頁為戰情中心範本的示範系統，商家、信件內容、數字皆為虛構；不會寄出任何信件，資料只存在這個頁面。</p>
+
+<script src="demo.js"></script>
+<script>
+const S = {sent: [1000, 600, 300, 80], open: 400, click: 90, reply: 20, unsub: 6};
+const SEQ = [["第一封", "自我介紹＋產品亮點", "名單推送後"], ["第二封", "客戶案例", "第一封滿 7 天未回"], ["第三封", "限時試用", "第二封滿 7 天未回"], ["第四封", "邀約通話／展示", "第三封滿 10 天未回"]];
+const THR = [["VIP 第一封", 5, 30, 12], ["一般 第一封", 5, 30, 18], ["第二封", 5, 50, 20], ["第三封", 3, 30, 9]];
+const Q = ["Sunny Tea House", "Harbor Boba Bar", "Jade Tea Lab", "Maple Cafe", "Lotus Boba Bar"].map((n, i) => ({name: n + " (Demo)", step: i % 3}));
+const logs = [];
+let paused = false;
+
+function renderKpis(){
+  $("#kpis").innerHTML = [["可寄名單", "1,200", "筆"], ["第一封已寄", nf(S.sent[0]), "封"], ["開信率", (S.open / S.sent[0] * 100).toFixed(1), "%"], ["回信", S.reply, "封"]]
+    .map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}<small>${k[2]}</small></div></div>`).join("");
+  $("#seq").innerHTML = SEQ.map((s, i) => `<div><b>${s[0]}・${s[1]}</b><span class="n">${nf(S.sent[i])}</span> 封<br><span class="c-mut">${s[2]}</span></div>`).join("");
+  const f = [["已寄", S.sent[0]], ["開信", S.open], ["點擊", S.click], ["回信", S.reply]];
+  $("#funnel").innerHTML = f.map(r => `<div class="r"><span>${r[0]}</span><div class="bar"><i style="width:${r[1] / S.sent[0] * 100}%"></i></div><span class="num">${nf(r[1])}</span></div>`).join("")
+    + `<p class="note" style="margin:4px 0 0">退訂 ${S.unsub} 筆，已自動加入永不寄送名單</p>`;
+  $("#thr").innerHTML = THR.map(t => `<tr><td>${t[0]}</td><td>${t[1]}</td><td>${t[2]}</td><td>${t[3]}${t[3] >= t[2] ? ' <span class="pill c-warn">已達上限</span>' : ""}</td></tr>`).join("");
+}
+function renderQueue(){
+  $("#queue").innerHTML = Q.length ? Q.map((q, i) => `<tr><td><a href="#" data-pv="${i}">${esc(q.name)}</a></td><td>${SEQ[q.step][0]}</td>
+    <td style="white-space:nowrap"><button class="btn ok" data-ok="${i}">核准</button> <button class="btn no" data-no="${i}">不寄</button></td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">✓ 待審信件都處理完了</td></tr>`;
+}
+function renderLog(){ $("#log").innerHTML = logs.map(l => `<li><time>${l[0]}</time>${esc(l[1])}</li>`).join(""); }
+
+$("#queue").addEventListener("click", e => {
+  const pv = e.target.closest("[data-pv]"), ok = e.target.closest("[data-ok]"), no = e.target.closest("[data-no]");
+  if (pv){
+    e.preventDefault(); const q = Q[+pv.dataset.pv], s = SEQ[q.step];
+    $("#prev").innerHTML = `<div class="mail"><div class="h">收件：${esc(q.name)}　主旨：${s[0]}｜${s[1]}（示範）</div>
+      Hi there,<br><br>這是一封<b>示範用</b>的開發信內容，介紹我們的設備如何幫門市穩定出杯品質、減少人力。<br><br>
+      <a href="#" onclick="toast('預覽中的連結已停用，不會計入點擊');return false">了解更多（預覽中已停用）</a><br><br>
+      <span style="color:#56657a;font-size:12px">不想再收到？<a href="#" onclick="return false">退訂</a></span></div>`;
+  }
+  if (ok || no){
+    const i = +(ok || no).dataset[ok ? "ok" : "no"], q = Q.splice(i, 1)[0];
+    logs.unshift([nowStr(), ok ? `核准 ${q.name} 的${SEQ[q.step][0]}，排入下一次排程寄出` : `${q.name} 標記不寄，加入永不寄送名單`]);
+    if (ok) S.sent[q.step]++;
+    $("#prev").innerHTML = ""; renderKpis(); renderQueue(); renderLog(); toast(ok ? "已核准" : "已排除");
+  }
+});
+$("#tick").addEventListener("click", () => {
+  if (paused){ logs.unshift([nowStr(), "排程觸發，但寄送已暫停，略過"]); renderLog(); toast("目前是暫停狀態"); return; }
+  let total = 0;
+  THR.forEach((t, i) => { const n = Math.max(0, Math.min(t[1], t[2] - t[3])); t[3] += n; total += n; S.sent[Math.max(0, i - 1)] += n; });
+  S.open += Math.round(total * 0.4); S.click += Math.round(total * 0.08);
+  logs.unshift([nowStr(), total ? `排程寄出 ${total} 封（依每次上限節流）` : "各類別都已達每日上限，今天不再寄"]);
+  renderKpis(); renderLog(); toast(total ? `寄出 ${total} 封（模擬）` : "已達每日上限");
+});
+$("#pause").addEventListener("click", () => {
+  paused = !paused;
+  $("#pause").textContent = paused ? "▶ 恢復寄送" : "⏸ 暫停寄送"; $("#pause").setAttribute("aria-pressed", String(paused));
+  logs.unshift([nowStr(), paused ? "管理者暫停寄送" : "管理者恢復寄送"]); renderLog();
+});
+renderKpis(); renderQueue(); renderLog();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>專案管理看板示範</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.wbs{list-style:none;margin:0;padding:0;font-size:13px;}
+.wbs > li{border-bottom:1px solid var(--grid);}
+.wbs .ph{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;padding:7px 2px;text-align:left;}
+.wbs .ph b{flex:1;}
+.wbs ul{list-style:none;margin:0 0 6px;padding:0 0 0 20px;}
+.wbs ul li{display:flex;gap:8px;align-items:center;padding:3px 0;color:var(--ink-2);}
+.wbs ul li label{flex:1;display:flex;gap:6px;align-items:center;cursor:pointer;}
+.wbs ul li.done label{color:var(--muted);text-decoration:line-through;}
+.gantt{position:relative;font-size:12px;}
+.gantt .row{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;height:26px;}
+.gantt .track{position:relative;height:14px;background:var(--surface-2);border-radius:3px;}
+.gantt .track i{position:absolute;top:0;height:14px;border-radius:3px;background:var(--s1);opacity:.85;}
+.gantt .track i b{position:absolute;top:0;bottom:0;left:0;background:var(--s3);border-radius:3px;}
+.gantt .today{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--warn);}
+.gantt .axis{display:grid;grid-template-columns:110px 1fr;gap:8px;color:var(--muted);font-size:11px;}
+.gantt .axis div:last-child{display:flex;justify-content:space-between;}
+.itto{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;}
+.itto div{border:1px solid var(--frame);border-radius:4px;padding:6px 8px;}
+.itto b{display:block;color:var(--ink);margin-bottom:2px;}
+@media (max-width:600px){.itto{grid-template-columns:1fr;}.gantt .row,.gantt .axis{grid-template-columns:80px 1fr;}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../">← 回戰情中心</a>
+  <h1>專案管理看板</h1><span class="en">Project PM</span>
+  <span class="tag">示範系統・虛構資料</span>
+  <span class="sp"></span>
+  <select id="proj" aria-label="選擇專案">
+    <option value="0">示範專案：年度國際展覽參展</option>
+    <option value="1">示範專案：新品發表會</option>
+  </select>
+</header>
+<main>
+  <div class="grid g4" id="kpis"></div>
+  <div class="grid g2" style="margin-top:12px">
+    <section class="panel">
+      <h2>工作分解（WBS）</h2>
+      <p class="note">點階段展開，勾選細項＝完成；完成度、甘特圖、預算會跟著更新。點細項名稱看 ITTO（輸入／工具／產出）。</p>
+      <ul class="wbs" id="wbs"></ul>
+    </section>
+    <div class="grid" style="align-content:start">
+      <section class="panel">
+        <h2>甘特時程</h2>
+        <div class="gantt" id="gantt"></div>
+      </section>
+      <section class="panel">
+        <h2 id="ittoT">細項 ITTO</h2>
+        <div id="itto"><p class="empty">← 點一個細項名稱</p></div>
+      </section>
+      <section class="panel">
+        <h2>風險與異常應變</h2>
+        <div class="tw"><table>
+          <thead><tr><th>風險</th><th>機率</th><th>影響</th><th>預設應變</th></tr></thead>
+          <tbody id="risk"></tbody>
+        </table></div>
+        <div class="toolbar" style="margin-top:8px"><button class="btn ghost" id="trig">模擬異常發生</button></div>
+        <ul class="log" id="rlog"></ul>
+      </section>
+    </div>
+  </div>
+</main>
+<p class="foot">本頁為戰情中心範本的示範系統，專案、預算、人名皆為虛構；資料只存在這個頁面，重新整理即還原。</p>
+
+<script src="demo.js"></script>
+<script>
+const W = 16; // 專案總週數
+const PROJ = [
+  {budget: 1200000, today: 7, phases: [
+    ["籌備規劃", 0, 3, [["確認展覽目標與 KPI", 1], ["報名與攤位選位", 1], ["預算編列核准", 1]]],
+    ["攤位設計", 2, 6, [["攤位 3D 配置", 1], ["發包裝潢廠商", 1], ["材質與燈光確認", 0]]],
+    ["展品準備", 4, 10, [["展示機台排程", 1], ["產品型錄印製", 0], ["展品運輸報關", 0]]],
+    ["行銷宣傳", 5, 13, [["社群預告貼文", 1], ["邀請函寄送", 0], ["媒體新聞稿", 0]]],
+    ["現場執行", 13, 15, [["人員排班", 0], ["佈展驗收", 0], ["名片與詢問單收集", 0]]],
+    ["撤展結案", 15, 16, [["撤展與退運", 0], ["名單匯入 CRM", 0], ["成效檢討報告", 0]]],
+  ], risks: [["運輸延誤，展品趕不上", "中", "高", "提前 2 週出貨＋備一台展示機"], ["攤位施工超支", "中", "中", "預留 10% 預備金，超過需主管核准"], ["現場網路不穩", "高", "低", "自備行動網路＋離線版簡報"]]},
+  {budget: 600000, today: 3, phases: [
+    ["企劃", 0, 2, [["發表主題與流程", 1], ["場地預訂", 1]]],
+    ["內容製作", 1, 6, [["發表簡報", 0], ["產品影片", 0], ["新聞稿", 0]]],
+    ["邀約", 3, 7, [["媒體名單", 0], ["經銷商邀請", 0]]],
+    ["活動當天", 8, 9, [["彩排", 0], ["直播", 0], ["問答整理", 0]]],
+  ], risks: [["講者臨時無法出席", "低", "高", "預先錄好備用影片"], ["報名人數不足", "中", "中", "第 5 週檢查，不足就加發邀請"]]},
+];
+let P = PROJ[0], log = [];
+
+function stats(){
+  const all = P.phases.flatMap(p => p[3]);
+  const done = all.filter(t => t[1]).length;
+  return {all: all.length, done, pct: Math.round(done / all.length * 100)};
+}
+function renderKpis(){
+  const s = stats(), spent = Math.round(P.budget * (0.08 + s.pct / 100 * 0.85));
+  $("#kpis").innerHTML = [["完成度", s.pct, "%"], ["工作項目", `${s.done}／${s.all}`, "項"], ["預算執行", Math.round(spent / P.budget * 100), "%"], ["目前週次", `W${P.today}`, `／W${W}`]]
+    .map(k => `<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}<small>${k[2]}</small></div></div>`).join("");
+}
+function renderWbs(){
+  $("#wbs").innerHTML = P.phases.map((p, i) => {
+    const d = p[3].filter(t => t[1]).length;
+    return `<li><button class="ph" data-ph="${i}" aria-expanded="${p.open ? "true" : "false"}">${p.open ? "▾" : "▸"} <b>${i + 1}. ${p[0]}</b>
+      <span class="c-mut">${d}/${p[3].length}</span><span class="bar" style="width:60px"><i style="width:${d / p[3].length * 100}%"></i></span></button>
+      <ul ${p.open ? "" : "hidden"}>${p[3].map((t, k) => `<li class="${t[1] ? "done" : ""}"><label><input type="checkbox" data-t="${i}-${k}" ${t[1] ? "checked" : ""}>
+        <span data-i="${i}-${k}" style="text-decoration:inherit">${t[0]}</span></label></li>`).join("")}</ul></li>`;
+  }).join("");
+}
+function renderGantt(){
+  $("#gantt").innerHTML = P.phases.map(p => {
+    const d = p[3].filter(t => t[1]).length / p[3].length;
+    return `<div class="row"><span>${p[0]}</span><div class="track"><i style="left:${p[1] / W * 100}%;width:${(p[2] - p[1]) / W * 100}%"><b style="width:${d * 100}%"></b></i>
+      <span class="today" style="left:${P.today / W * 100}%"></span></div></div>`;
+  }).join("") + `<div class="axis"><span></span><div><span>W0</span><span>W${W / 2}</span><span>W${W}</span></div></div>
+    <p class="note" style="margin-top:6px">藍＝排定區間、綠＝已完成比例、黃線＝本週</p>`;
+}
+function renderRisk(){
+  const c = v => v === "高" ? "c-crit" : v === "中" ? "c-warn" : "c-good";
+  $("#risk").innerHTML = P.risks.map(r => `<tr><td>${r[0]}</td><td><span class="pill ${c(r[1])}">${r[1]}</span></td><td><span class="pill ${c(r[2])}">${r[2]}</span></td><td>${r[3]}</td></tr>`).join("");
+  $("#rlog").innerHTML = log.map(l => `<li><time>${l[0]}</time>${esc(l[1])}</li>`).join("");
+}
+function renderAll(){ renderKpis(); renderWbs(); renderGantt(); renderRisk(); }
+
+$("#wbs").addEventListener("click", e => {
+  const ph = e.target.closest("[data-ph]");
+  if (ph){ const p = P.phases[+ph.dataset.ph]; p.open = !p.open; renderWbs(); return; }
+  const it = e.target.closest("[data-i]");
+  if (it){
+    e.preventDefault();
+    const [i, k] = it.dataset.i.split("-").map(Number), t = P.phases[i][3][k];
+    $("#ittoT").textContent = "細項 ITTO：" + t[0];
+    $("#itto").innerHTML = `<div class="itto"><div><b>輸入 Input</b>${P.phases[i][0]}階段的需求、預算上限、時程</div>
+      <div><b>工具 Tool</b>${["檢核表", "廠商比價表", "3D 配置圖", "排程表"][k % 4]}・會議討論</div>
+      <div><b>產出 Output</b>${t[0]}的確認文件（可掛附件）</div></div>
+      <p class="note" style="margin-top:8px">狀態：${t[1] ? "✓ 已完成" : "進行中"}　負責人：${["專案經理", "行銷 甲", "業務 乙"][k % 3]}（示範）</p>`;
+  }
+});
+$("#wbs").addEventListener("change", e => {
+  const cb = e.target.closest("[data-t]"); if (!cb) return;
+  const [i, k] = cb.dataset.t.split("-").map(Number);
+  P.phases[i][3][k][1] = cb.checked ? 1 : 0;
+  renderKpis(); renderWbs(); renderGantt();
+});
+$("#trig").addEventListener("click", () => {
+  const r = P.risks[Math.floor(Math.random() * P.risks.length)];
+  log.unshift([nowStr(), `異常「${r[0]}」發生 → 啟動預設應變：${r[3]}；已通知專案經理`]);
+  toast("已啟動預設應變方案"); renderRisk();
+});
+$("#proj").addEventListener("change", e => { P = PROJ[+e.target.value]; log = []; $("#ittoT").textContent = "細項 ITTO"; $("#itto").innerHTML = `<p class="empty">← 點一個細項名稱</p>`; renderAll(); });
+P.phases[1].open = true; PROJ[1].phases[1].open = true;
+renderAll();
+</script>
+</body>
+</html>
