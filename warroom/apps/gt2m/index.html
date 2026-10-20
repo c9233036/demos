@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方殼外觀機型示範</title>
+<style>
+  :root { --bg:#1d2126; --panel:#2a2f36; --fg:#e8e8e8; --muted:#9aa3ad; --acc:#c9a84c; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:"Microsoft JhengHei",Arial,sans-serif; overflow:hidden; }
+  #c { width:100%; height:100%; display:block; }
+  #ui { position:absolute; top:12px; left:12px; width:300px; max-height:calc(100vh - 24px); overflow-y:auto; box-sizing:border-box; background:var(--panel); padding:12px 14px; border-radius:8px; font-size:13px; line-height:1.6; box-shadow:0 2px 10px rgba(0,0,0,.4); }
+  #ui h1 { font-size:15px; margin:0 0 6px; color:var(--acc); }
+  #ui label { display:block; margin-top:8px; }
+  #ui input[type=range] { width:100%; }
+  #ui button { margin:6px 6px 0 0; padding:5px 10px; background:#3a414a; color:var(--fg); border:1px solid #555; border-radius:4px; cursor:pointer; font-size:12px; }
+  #ui button:hover { border-color:var(--acc); }
+  .hint { color:var(--muted); font-size:12px; margin-top:8px; }
+  #msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:18px; pointer-events:none; }
+  #info { margin-top:6px; color:var(--acc); min-height:18px; }
+  #sheetBox { position:fixed; inset:0; z-index:20; background:rgba(10,12,15,.92); display:flex; flex-direction:column; }
+  #sheetBox[hidden] { display:none; }
+  #sheetBar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:10px 14px; background:var(--panel); font-size:13px; }
+  #sheetBar button { padding:5px 12px; background:#3a414a; color:var(--fg); border:1px solid #555; border-radius:4px; cursor:pointer; font-size:13px; }
+  #sheetBar button:hover, #sheetBar button[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
+  #sheetBar .sp { flex:1; }
+  #sheetWrap { flex:1; overflow:auto; padding:14px; text-align:center; }
+  #sheet { max-width:100%; height:auto; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="msg">載入中…</div>
+<div id="sheetBox" hidden role="dialog" aria-modal="true" aria-label="2D 圖">
+  <div id="sheetBar">
+    <button id="sh3v" aria-pressed="true">外觀三視圖</button>
+    <button id="shTop" aria-pressed="false">內部配件 2D 上視圖</button>
+    <span class="sp" id="sheetNote">依目前 3D 畫面的狀態（滑桿、隱藏零件、外殼）出圖</span>
+    <button id="shPng">下載 PNG</button>
+    <button id="shClose">關閉（回 3D）</button>
+  </div>
+  <div id="sheetWrap"><canvas id="sheet"></canvas></div>
+</div>
+<div id="ui">
+  <h1>示範機型 整機 <span style="font-size:11px;color:#e0b25a;border:1px solid #e0b25a;border-radius:9px;padding:0 6px">示範・已去機敏</span></h1>
+  <div>尺寸：<span id="size"></span> mm</div>
+  <label>剖切高度（往下拉＝切掉上半部，看底座）
+    <input id="cut" type="range" min="0" max="1000" value="1000"></label>
+  <div>保留高度：<span id="cutv"></span></div>
+  <label>剖切方向
+    <select id="axis"><option value="1">由上往下（高度）</option><option value="0">由右往左</option><option value="2">由前往後</option></select></label>
+  <label><input id="xray" type="checkbox"> 外殼半透明（大零件變透明）</label>
+  <div>
+    <button id="bBase">底座＋內部</button>
+        <button id="bFit">重置視角</button>
+  </div>
+  <div>
+    <button id="b3v">畫成三視圖</button>
+    <button id="bTop2d">內部配件 2D 上視圖</button>
+  </div>
+  <div id="info"></div>
+  <h1 style="margin-top:12px">方殼外觀（示範）</h1>
+  <label><input id="woodOn" type="checkbox" checked> 外框四面包覆烤漆方殼（底緣坐在封底板上）</label>
+  <label>外殼板厚度 <span id="vWt"></span><input id="wT" type="range" min="10" max="30" value="10"></label>
+  <label>外殼底緣圓角 <span id="vWf"></span><input id="wF" type="range" min="0" max="17" value="2"></label>
+  <label>四角轉角半徑：頂 <span id="vWct"></span><input id="wCt" type="range" min="20" max="120" value="22"></label>
+  <label>四角轉角半徑：底 <span id="vWcb"></span><input id="wCb" type="range" min="20" max="200" value="22"></label>
+  <label>前後斜度（底部往內收） <span id="vWb"></span><input id="wB" type="range" min="0" max="100" step="0.5" value="0"></label>
+  <label>左右側斜度（底部往內收） <span id="vWs"></span><input id="wS" type="range" min="0" max="100" value="0"></label>
+  <label>外殼往外距離：左右（負＝往內） <span id="vWo"></span><input id="wO" type="range" min="-10" max="30" step="0.5" value="30"></label>
+  <label>外殼往外距離：前後（負＝往內） <span id="vWox"></span><input id="wOx" type="range" min="-30" max="30" step="0.5" value="30"></label>
+  <label>電源旋鈕往外移（內部軸管加長） <span id="vKo"></span><input id="kOut" type="range" min="0" max="40" value="20"></label>
+  <h1 style="margin-top:12px">底座改版</h1>
+  <label><input id="redo" type="checkbox" checked> 套用新底座（取消＝看原本）</label>
+  <label><input id="eOn" type="checkbox" checked> 兩端端板（底部裁到封底板上）</label>
+  <label>不鏽鋼底盒長度 <span id="vLen"></span>
+    <input id="sLen" type="range" min="200" max="880" value="394"></label>
+  <label>不鏽鋼底盒高度 <span id="vH"></span>
+    <input id="sH" type="range" min="10" max="77" value="77"></label>
+  <label>內部零件往上移 <span id="vUp"></span>
+    <input id="sUp" type="range" min="0" max="150" value="83"></label>
+  <label>馬達組旋轉 <span id="vMot"></span>（負＝往左轉）
+    <input id="motorRot" type="range" min="-180" max="180" step="1" value="0"></label>
+  <label>馬達繞自身軸滾轉 <span id="vRoll"></span>（-90＝頂部朝右、底座朝左鎖豎板）
+    <input id="motorRoll" type="range" min="-180" max="180" step="1" value="-90"></label>
+  <label>泵頭繞馬達軸轉向 <span id="vPump"></span>
+    <input id="pumpRoll" type="range" min="-180" max="180" step="5" value="85"></label>
+  <label><input id="pumpAuto" type="checkbox" checked> 自動找角度（接頭不穿封底板、不高於外框、不穿豎板）</label>
+  <h1 style="margin-top:12px">豎板（自己調位置）</h1>
+  <label><input id="pOn" type="checkbox" checked> 顯示豎板</label>
+  <label>前後位置 <span id="vPx"></span><input id="pX" type="range" min="-210" max="210" value="-16"></label>
+  <label>左右位置 <span id="vPz"></span><input id="pZ" type="range" min="-440" max="440" value="-256"></label>
+  <label>寬度 <span id="vPw"></span><input id="pW" type="range" min="20" max="880" value="213"></label>
+  <label>高度 <span id="vPh"></span><input id="pH" type="range" min="10" max="300" value="134"></label>
+  <label>底部離地 <span id="vPy"></span><input id="pY" type="range" min="0" max="300" value="111"></label>
+  <label>厚度 <span id="vPt"></span><input id="pT" type="range" min="0.5" max="10" step="0.5" value="1.5"></label>
+  <label>水平旋轉 <span id="vPr"></span><input id="pR" type="range" min="-180" max="180" value="90"></label>
+  <label>豎板一體折出的底腳 <span id="vPf"></span><input id="pF" type="range" min="0" max="150" value="0"></label>
+  <label>底腳／L 角鐵方向 <select id="pFd"><option value="1">往右（馬達那側）</option><option value="-1">往左（鍋爐那側）</option></select></label>
+  <h1 style="margin-top:12px">豎板右側 L 角鐵（馬達側）</h1>
+  <label><input id="aOn" type="checkbox" checked> 顯示 L 角鐵</label>
+  <label>立邊高 <span id="vAh"></span><input id="aH" type="range" min="10" max="134" value="15"></label>
+  <label>底邊長 <span id="vAf"></span><input id="aF" type="range" min="10" max="120" value="40"></label>
+  <label>寬度 <span id="vAw"></span><input id="aW" type="range" min="10" max="213" value="170"></label>
+  <label>厚度 <span id="vAt"></span><input id="aT" type="range" min="0.5" max="6" step="0.5" value="1.5"></label>
+  <label><input id="mLow" type="checkbox" checked> 馬達不高於金色外框頂（自動往下降）</label>
+  <label><input id="mAttach" type="checkbox" checked> 馬達鎖在豎板上（馬達左側貼齊豎板）</label>
+  <label><input id="pSnap" type="checkbox"> 鎖在馬達左側（跟著馬達自動貼齊）</label>
+  <button id="pCopy">複製目前數值</button>
+  <div class="hint">左鍵拖曳＝旋轉　右鍵拖曳＝平移　滾輪＝縮放<br>點一下零件＝選取（亮綠色＋顯示編號尺寸）<br>要隱藏：選取後按「隱藏選取的零件」</div>
+  <button id="bHideSel">隱藏選取的零件</button>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1d2126);
+const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
+const controls = new OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.6));
+const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(1, 2, 1.5); scene.add(dl);
+const dl2 = new THREE.DirectionalLight(0xffffff, 0.6); dl2.position.set(-1, -0.5, -1); scene.add(dl2);
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+const meta = await fetch('model.json').then(r => r.json());
+const gz = await fetch('model.bin.gz').then(r => r.body.pipeThrough(new DecompressionStream('gzip')));
+const buf = new Uint8Array(await new Response(gz).arrayBuffer());
+const nPos = meta.nPos, nIdx = meta.nIdx, nV = nPos / 3;
+const pos = new Float32Array(nPos), idx = new Uint32Array(nIdx);
+let o = 0;
+for (let c = 0; c < 3; c++) { let acc = 0; const lo = meta.lo[c], sc = meta.scale[c];
+  for (let i = 0; i < nV; i++) { acc = (acc + (buf[o + i] | buf[o + nV + i] << 8)) & 65535; pos[i * 3 + c] = lo + acc * sc; } o += 2 * nV; }
+{ const ev = new DataView(buf.buffer, o + 2 * nIdx); let e = 0, hw = -1;
+  for (let i = 0; i < nIdx; i++) { let z = buf[o + i] | buf[o + nIdx + i] << 8; if (z === 65535) z = ev.getUint32(4 * e++, true);
+    const v = hw + 1 - (z & 1 ? -(z + 1) / 2 : z / 2); idx[i] = v; if (v > hw) hw = v; } }
+const group = new THREE.Group(); scene.add(group);
+const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+const palette = [0xb8bec6, 0xc98a4a, 0xd4b45a, 0x8fa3b8, 0x9c9c9c, 0xcfd5db, 0x7d8a96, 0xbfa58a];
+const meshes = [];
+const bigVol = meta.parts.map(p => p[2] * p[3] * p[4]);
+meta.parts.forEach((p, i) => {
+  const [i0, n, sx, sy, sz] = p;
+  const sub = idx.subarray(i0, i0 + n);
+  let mn = Infinity, mx = -Infinity;
+  for (let k = 0; k < sub.length; k++) { if (sub[k] < mn) mn = sub[k]; if (sub[k] > mx) mx = sub[k]; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos.slice(mn * 3, (mx + 1) * 3), 3));
+  const loc = new Uint32Array(sub.length); for (let k = 0; k < sub.length; k++) loc[k] = sub[k] - mn;
+  g.setIndex(new THREE.BufferAttribute(loc, 1)); g.computeVertexNormals(); g.computeBoundingBox();
+  const thin = Math.min(sx, sy, sz) < 4 && Math.max(sx, sy, sz) > 150;
+  const col = thin ? 0xc7ccd2 : palette[i % palette.length];
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: col, metalness: 0.35, roughness: 0.55, side: THREE.DoubleSide, clippingPlanes: [plane] }));
+  m.userData = { i, size: [sx, sy, sz], big: Math.max(sx, sy, sz) > 400 && thin };
+  group.add(m); meshes.push(m);
+});
+const box = new THREE.Box3().setFromObject(group);
+const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+document.getElementById('size').textContent = `${Math.round(size.x)} × ${Math.round(size.y)} × ${Math.round(size.z)}`;
+function fit() {
+  const r = size.length() * 0.6;
+  camera.position.copy(center).add(new THREE.Vector3(r * 0.9, r * 0.6, r * 1.2));
+  controls.target.copy(center); controls.update();
+}
+fit();
+const cut = document.getElementById('cut'), axisSel = document.getElementById('axis'), cutv = document.getElementById('cutv');
+function applyCut() {
+  const a = +axisSel.value; const lo = box.min.getComponent(a), hi = box.max.getComponent(a);
+  const v = lo + (hi - lo) * cut.value / 1000;
+  const n = new THREE.Vector3(); n.setComponent(a, -1);
+  plane.normal.copy(n); plane.constant = v;
+  cutv.textContent = `${Math.round(v - lo)} / ${Math.round(hi - lo)} mm`;
+}
+cut.oninput = applyCut; axisSel.onchange = applyCut; applyCut();
+document.getElementById('xray').onchange = e => {
+  meshes.forEach(m => { if (m.userData.big) { m.material.transparent = e.target.checked; m.material.opacity = e.target.checked ? 0.18 : 1; m.material.depthWrite = !e.target.checked; m.material.needsUpdate = true; } });
+};
+if (document.getElementById('bAll')) document.getElementById('bAll').onclick = () => { meshes.forEach(m => m.visible = true); cut.value = 1000; axisSel.value = 1; applyCut(); };
+document.getElementById('bFit').onclick = fit;
+document.getElementById('bHideSel').onclick = () => { const m = window.__sel; if (!m) return;
+  m.material.emissive.setHex(0); m.visible = false; window.__sel = null;
+  document.getElementById('info').textContent = `已隱藏零件（按「底座＋內部」可恢復）`; };
+const BASE_HIDE = new Set([25, 185, 833, 834, 835, 836, 710, 712, 715, 716, 717, 718, 831, 832, 329]);
+const isT = b => b.min.y >= 245 || b.max.y > 280;
+const isDeck = b => b.max.y > 240 && b.min.y > 200 && (b.max.x - b.min.x) * (b.max.z - b.min.z) > 40000;
+function baseView() {
+  cut.value = 1000; axisSel.value = 1; applyCut();
+  meshes.forEach(m => { const b = m.geometry.boundingBox; m.visible = !(isT(b) || isDeck(b) || BASE_HIDE.has(m.userData.i)); });
+  camera.position.set(center.x + 650, 800, center.z + 750); controls.target.set(0, 100, 0); controls.update();
+}
+document.getElementById('bBase').onclick = baseView;
+baseView();
+const HOUSING_BOTTOM = 111, OLD_BOX = [0], OLD_FEET = [12,13,14,15,16,17,18,19,165,166,167,168,169,170,171,172,173,174,175,176];
+const steel = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, metalness: 0.75, roughness: 0.32 });
+const redoGroup = new THREE.Group(); scene.add(redoGroup);
+const origY = new Map(); meshes.forEach(m => origY.set(m, m.position.y));
+const lowParts = meshes.filter(m => { const b = m.geometry.boundingBox;
+  return b.min.y < HOUSING_BOTTOM - 5 && b.max.y > 0 && !OLD_BOX.includes(m.userData.i) && !OLD_FEET.includes(m.userData.i)
+    && (b.max.x - b.min.x) < 480 && b.max.y < 281; });
+function roundedBox(w, h, d, r) {
+  const s = new THREE.Shape(); const x = -w / 2, z = -d / 2;
+  s.moveTo(x + r, z); s.lineTo(x + w - r, z); s.quadraticCurveTo(x + w, z, x + w, z + r);
+  s.lineTo(x + w, z + d - r); s.quadraticCurveTo(x + w, z + d, x + w - r, z + d);
+  s.lineTo(x + r, z + d); s.quadraticCurveTo(x, z + d, x, z + d - r); s.lineTo(x, z + r); s.quadraticCurveTo(x, z, x + r, z);
+  const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: true, bevelThickness: 3, bevelSize: 3, bevelSegments: 3 });
+  g.rotateX(Math.PI / 2); return g;
+}
+const FRAME_IDS = [5, 6, 7, 669, 670, 671, 688, 689, 690, 729, 730];
+let _hull = null;
+function frameBottomHull() {
+  if (_hull) return _hull;
+  const pts = [];
+  FRAME_IDS.forEach(i => { const p = meshes[i].geometry.attributes.position;
+    for (let k = 0; k < p.count; k++) if (p.getY(k) < 116) pts.push([p.getX(k), p.getZ(k)]); });
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of pts.slice().reverse()) { while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  _hull = lo.slice(0, -1).concat(up.slice(0, -1));
+  return _hull;
+}
+const MOTOR_EXTRA = [164, 322, 323, 324, 328, 332, 337, 665, 666, 667];
+const MOTOR = meshes.filter(m => { const b = m.geometry.boundingBox, i = m.userData.i;
+  return MOTOR_EXTRA.includes(i) || (!FRAME_IDS.includes(i) && i !== 9 && b.min.x >= -210 && b.max.x <= 90 && b.min.z >= -385 && b.max.z <= -240 && b.min.y >= 40 && b.max.y < 300); });
+const MOTOR_AXIS = new THREE.Vector3(-70.5, 117.5, -315);
+const PUMP = (() => { const pb = meshes[164].geometry.boundingBox.clone().expandByScalar(20);
+  return MOTOR.filter(m => ![156, 157, 158].includes(m.userData.i) && (m.userData.i === 164 || MOTOR_EXTRA.includes(m.userData.i) || m.geometry.boundingBox.intersectsBox(pb))); })();
+const MOT_OFF = { dz: 0, dy: 0 };
+const MOTOR_P = (() => { const bb = new THREE.Box3(); MOTOR.forEach(m => bb.union(m.geometry.boundingBox)); return bb.getCenter(new THREE.Vector3()); })();
+function rebuild() {
+  const on = document.getElementById('redo').checked;
+  const L = +document.getElementById('sLen').value, H = +document.getElementById('sH').value, UP = +document.getElementById('sUp').value;
+  document.getElementById('vLen').textContent = `${L} mm（原 880）`;
+  document.getElementById('vH').textContent = `${H} mm（原 77）`;
+  document.getElementById('vUp').textContent = `${UP} mm`;
+  redoGroup.clear();
+  meshes.forEach(m => { m.position.set(0, origY.get(m), 0); m.rotation.set(0, 0, 0); });
+  OLD_BOX.concat(OLD_FEET).forEach(i => meshes[i].visible = !on && !BASE_HIDE.has(i));
+  if (!on) return;
+  const isMid = m => { const b = m.geometry.boundingBox;
+    return b.min.z >= -L / 2 && b.max.z <= L / 2 && b.min.x >= -191 && b.max.x <= 191; };
+  const live = lowParts.filter(m => m.visible);
+  const mids = live.filter(isMid);
+  const midLow = mids.length ? Math.min(...mids.map(m => m.geometry.boundingBox.min.y)) : Infinity;
+  const midUp = Math.max(0, (HOUSING_BOTTOM - H + 1.5) - midLow);
+  const outs = live.filter(m => !isMid(m));
+  const outLow = outs.length ? Math.min(...outs.map(m => m.geometry.boundingBox.min.y)) : Infinity;
+  const outUp = Math.max(UP, HOUSING_BOTTOM - outLow);
+  lowParts.forEach(m => m.position.y = origY.get(m) + (isMid(m) ? midUp : outUp));
+  document.getElementById('vUp').textContent = `${UP} mm → 實際 ${Math.round(outUp)} mm（不低於封底板）；中間零件上移 ${Math.round(midUp)} mm（貼齊底盒底面）`;
+  window.__lift = { outUp, midUp, outLow, midLow };
+  const deg = +document.getElementById('motorRot').value, th = deg * Math.PI / 180;
+  document.getElementById('vMot').textContent = `${deg}°`;
+  const rollDeg = +document.getElementById('motorRoll').value, phi = rollDeg * Math.PI / 180;
+  document.getElementById('vRoll').textContent = `${rollDeg}°`;
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(phi, th, 0, 'YXZ'));
+  const qp = MOTOR_AXIS.clone().applyQuaternion(q);
+  MOT_OFF.dz = 0; MOT_OFF.dy = 0; window.__motorQ = q;
+  MOTOR.forEach(m => { const lift = m.position.y - origY.get(m); m.userData.lift = lift;
+    m.quaternion.copy(q); m.position.set(MOTOR_AXIS.x - qp.x, MOTOR_AXIS.y - qp.y + lift, MOTOR_AXIS.z - qp.z); });
+  const BT = 1.5;
+  const rrShape = (P, w, d, r) => { const x = -w / 2, z = -d / 2;
+    P.moveTo(x + r, z); P.lineTo(x + w - r, z); P.quadraticCurveTo(x + w, z, x + w, z + r);
+    P.lineTo(x + w, z + d - r); P.quadraticCurveTo(x + w, z + d, x + w - r, z + d);
+    P.lineTo(x + r, z + d); P.quadraticCurveTo(x, z + d, x, z + d - r); P.lineTo(x, z + r); P.quadraticCurveTo(x, z, x + r, z); return P; };
+  const ring = rrShape(new THREE.Shape(), 382, L, 22); ring.holes.push(rrShape(new THREE.Path(), 382 - 2 * BT, L - 2 * BT, 22 - BT));
+  const wg = new THREE.ExtrudeGeometry(ring, { depth: H, bevelEnabled: false }); wg.rotateX(Math.PI / 2);
+  const walls = new THREE.Mesh(wg, steel); walls.position.y = HOUSING_BOTTOM; walls.userData.boxPart = 'walls'; redoGroup.add(walls);
+  const bg = new THREE.ExtrudeGeometry(rrShape(new THREE.Shape(), 382, L, 22), { depth: BT, bevelEnabled: false }); bg.rotateX(Math.PI / 2);
+  const bottom = new THREE.Mesh(bg, steel); bottom.position.y = HOUSING_BOTTOM - H + BT; bottom.userData.boxPart = 'bottom'; redoGroup.add(bottom);
+  const outline = new THREE.Shape(), hole = new THREE.Path();
+  const hull = frameBottomHull(); outline.moveTo(hull[0][0], hull[0][1]); hull.slice(1).forEach(p => outline.lineTo(p[0], p[1])); outline.closePath();
+  const rr = (p, w, d, r) => { const x = -w / 2, z = -d / 2;
+    p.moveTo(x + r, z); p.lineTo(x + w - r, z); p.quadraticCurveTo(x + w, z, x + w, z + r);
+    p.lineTo(x + w, z + d - r); p.quadraticCurveTo(x + w, z + d, x + w - r, z + d);
+    p.lineTo(x + r, z + d); p.quadraticCurveTo(x, z + d, x, z + d - r); p.lineTo(x, z + r); p.quadraticCurveTo(x, z, x + r, z); };
+  rr(hole, 382, L, 22); outline.holes.push(hole);
+  const pg = new THREE.ExtrudeGeometry(outline, { depth: 1.5, bevelEnabled: false }); pg.rotateX(Math.PI / 2);
+  const plate = new THREE.Mesh(pg, steel); plate.position.y = HOUSING_BOTTOM + 1.5; redoGroup.add(plate);
+  const footH = HOUSING_BOTTOM, FR_ = 25.5;
+  const prof = [new THREE.Vector2(0, 0)];
+  for (let k = 0; k <= 8; k++) { const a = -Math.PI / 2 + (Math.PI / 2) * k / 8; prof.push(new THREE.Vector2(FR_ - 3 + 3 * Math.cos(a), 3 + 3 * Math.sin(a))); }
+  prof.push(new THREE.Vector2(FR_, 5), new THREE.Vector2(FR_ - 0.5, 5), new THREE.Vector2(FR_ - 0.5, 6), new THREE.Vector2(FR_, 6),
+            new THREE.Vector2(FR_, footH - 0.5), new THREE.Vector2(FR_ - 0.5, footH), new THREE.Vector2(0, footH));
+  const legGeo = new THREE.LatheGeometry(prof, 48);
+  for (const fx of [140, -115]) for (const fz of [-329, 329]) {
+    const c = new THREE.Mesh(legGeo, steel); c.position.set(fx, 0, fz); c.userData.leg = true; redoGroup.add(c);
+  }
+  for (const s of [1, -1]) {
+    const mat = steel.clone();
+    mat.side = THREE.DoubleSide;
+    mat.clippingPlanes = [plane, new THREE.Plane(new THREE.Vector3(0, 1, 0), -(HOUSING_BOTTOM + 1.5)), new THREE.Plane(new THREE.Vector3(0, 0, s), -385)];
+    const e = new THREE.Mesh(meshes[0].geometry, mat); e.userData.endWall = s; e.userData.baseClip = mat.clippingPlanes.slice(); e.visible = document.getElementById('eOn').checked; redoGroup.add(e);
+  }
+}
+const plateMat = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, metalness: 0.75, roughness: 0.32 });
+const vPlate = new THREE.Group(), legV = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), plateMat), legH = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), plateMat);
+vPlate.add(legV, legH); scene.add(vPlate);
+const boltMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.6, roughness: 0.4 });
+const bolts = [0, 1, 2].map(() => { const b = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 3, 20), boltMat); vPlate.add(b); return b; });
+const angMat = new THREE.MeshStandardMaterial({ color: 0xa9aeb3, metalness: 0.75, roughness: 0.35 });
+const angV = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), angMat), angH = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), angMat);
+vPlate.add(angV, angH);
+const angBoltsV = [0, 1].map(() => { const b = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 3, 20), boltMat); b.rotation.z = Math.PI / 2; vPlate.add(b); return b; });
+const angBoltsH = [0, 1].map(() => { const b = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 3, 20), boltMat); vPlate.add(b); return b; });
+const pv = id => +document.getElementById(id).value;
+function updatePlate() {
+  const x = pv('pX'), z = pv('pZ'), w = pv('pW'), h = pv('pH'), y = pv('pY'), t = pv('pT'), r = pv('pR'), f = pv('pF'), fd = pv('pFd');
+  vPlate.visible = document.getElementById('pOn').checked;
+  legV.scale.set(t, h, w); legV.position.set(0, h / 2, 0);
+  legH.visible = f > 0; legH.scale.set(f + t, t, w); legH.position.set(fd * (f / 2), t / 2, 0);
+  bolts.forEach((b, k) => { b.visible = f >= 15; b.position.set(fd * (t / 2 + f / 2), t + 1.5, (k - 1) * w * 0.35); });
+  const aOn = document.getElementById('aOn').checked, ah = pv('aH'), af = pv('aF'), aw = Math.min(pv('aW'), w), at = pv('aT'), s = fd;
+  [angV, angH, ...angBoltsV, ...angBoltsH].forEach(o => o.visible = aOn);
+  angV.scale.set(at, ah, aw); angV.position.set(s * (t / 2 + at / 2), ah / 2, 0);
+  angH.scale.set(af, at, aw); angH.position.set(s * (t / 2 + af / 2), at / 2, 0);
+  angBoltsV.forEach((b, k) => b.position.set(s * (t / 2 + at + 1.5), ah * 0.6, (k ? 1 : -1) * aw * 0.3));
+  angBoltsH.forEach((b, k) => b.position.set(s * (t / 2 + at + af * 0.55), at + 1.5, (k ? 1 : -1) * aw * 0.3));
+  [['vAh', `${ah} mm`], ['vAf', `${af} mm`], ['vAw', `${aw} mm`], ['vAt', `${at} mm`]].forEach(([id, v]) => document.getElementById(id).textContent = v);
+  vPlate.position.set(x, y, z);
+  vPlate.rotation.set(0, r * Math.PI / 180, 0);
+  attachMotor();
+  [['vPx', `${x} mm`], ['vPz', `${z} mm`], ['vPw', `${w} mm`], ['vPh', `${h} mm`], ['vPy', `${y} mm`], ['vPt', `${t} mm`], ['vPr', `${r}°`], ['vPf', `${f} mm`]]
+    .forEach(([id, s]) => document.getElementById(id).textContent = s);
+}
+['aOn', 'aH', 'aF', 'aW', 'aT'].forEach(id => document.getElementById(id).addEventListener('input', updatePlate));
+['pOn', 'pX', 'pZ', 'pW', 'pH', 'pY', 'pT', 'pR', 'pF', 'pFd'].forEach(id => document.getElementById(id).addEventListener('input', () => {
+  if (id !== 'pOn' && id !== 'pT' && id !== 'pF' && id !== 'pFd') document.getElementById('pSnap').checked = false;
+  updatePlate(); }));
+function attachMotor() {
+  if (!document.getElementById('mAttach') || !document.getElementById('mAttach').checked || !vPlate.visible) return;
+  scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3(); [156, 157, 158].forEach(i => bb.union(new THREE.Box3().setFromObject(meshes[i])));
+  const face = pv('pZ') - pv('pT') / 2;
+  if (Math.abs(pv('pR')) !== 90) return;
+  const dz = face - bb.max.z;
+  MOTOR.forEach(m => m.position.z += dz); MOT_OFF.dz += dz;
+  lowerMotor();
+}
+const FRAME_TOP = Math.max(...FRAME_IDS.map(i => meshes[i].geometry.boundingBox.max.y));
+function lowerMotor() {
+  if (!document.getElementById('mLow').checked) return;
+  scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3(); MOTOR.forEach(m => { if (m.visible && !PUMP.includes(m)) bb.union(new THREE.Box3().setFromObject(m)); });
+  const dy = Math.min(0, FRAME_TOP - bb.max.y);
+  MOTOR.forEach(m => m.position.y += dy); MOT_OFF.dy += dy;
+  window.__motorBB = { top: bb.max.y + dy, bottom: bb.min.y + dy, dy };
+  clockPump();
+  scene.updateMatrixWorld(true);
+  const PLATE_TOP = HOUSING_BOTTOM + 1.5; window.__raised = [];
+  MOTOR.forEach(m => { if (!m.visible || PUMP.includes(m) || [156, 157, 158].includes(m.userData.i)) return; const b = new THREE.Box3().setFromObject(m);
+    if (b.min.y < PLATE_TOP) { m.position.y += PLATE_TOP - b.min.y; window.__raised.push(m.userData.i); } });
+  scene.updateMatrixWorld(true);
+  clampToFrame();
+}
+function setPump(psiDeg) {
+  const q = window.__motorQ; if (!q) return;
+  const qP = q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), psiDeg * Math.PI / 180));
+  const qp = MOTOR_AXIS.clone().applyQuaternion(qP);
+  PUMP.forEach(m => { m.quaternion.copy(qP);
+    m.position.set(MOTOR_AXIS.x - qp.x, MOTOR_AXIS.y - qp.y + m.userData.lift + MOT_OFF.dy, MOTOR_AXIS.z - qp.z + MOT_OFF.dz); });
+  scene.updateMatrixWorld(true);
+}
+function pumpViolation() {
+  const bb = new THREE.Box3(); PUMP.forEach(m => { if (m.visible) bb.union(new THREE.Box3().setFromObject(m)); });
+  const face = pv('pZ') - pv('pT') / 2, hullZ = 442.7;
+  const core = new THREE.Box3(); [156, 157, 158].forEach(i => core.union(new THREE.Box3().setFromObject(meshes[i])));
+  return Math.max(0, HOUSING_BOTTOM + 1.5 - core.min.y) + Math.max(0, HOUSING_BOTTOM + 1.5 - bb.min.y) + Math.max(0, bb.max.y - FRAME_TOP)
+       + (vPlate.visible ? Math.max(0, bb.max.z - face) : 0) + Math.max(0, -hullZ - bb.min.z);
+}
+function shiftMotorY(d) { if (!d) return; MOTOR.forEach(m => m.position.y += d); MOT_OFF.dy += d; scene.updateMatrixWorld(true); }
+function pumpTopExcess() {
+  const bb = new THREE.Box3(); PUMP.forEach(m => { if (m.visible) bb.union(new THREE.Box3().setFromObject(m)); });
+  return Math.max(0, bb.max.y - FRAME_TOP);
+}
+function clockPump() {
+  let psi = +document.getElementById('pumpRoll').value;
+  if (document.getElementById('pumpAuto').checked) {
+    let best = null;
+    for (let a = -180; a < 180; a += 5) { setPump(a); const ex = pumpTopExcess(); shiftMotorY(-ex); setPump(a);
+      const v = pumpViolation(); shiftMotorY(ex);
+      if (!best || v < best.v - 0.01 || (Math.abs(v - best.v) <= 0.01 && Math.abs(a) < Math.abs(best.a))) best = { a, v }; }
+    psi = best.a; document.getElementById('pumpRoll').value = psi;
+  }
+  setPump(psi); shiftMotorY(-pumpTopExcess()); setPump(psi);
+  const v = pumpViolation(); window.__pump = { psi, violation: +v.toFixed(1) };
+  connectPipes();
+  document.getElementById('vPump').textContent = `${psi}°` + (v > 0.5 ? `（仍有 ${v.toFixed(0)} mm 超出，找不到完全合規角度）` : '（接頭全在範圍內）');
+}
+const PIPE_PORT = new THREE.Vector3(113.2, 171.5, -330.6), PIPE_CUT = new THREE.Vector3(114, 209.4, -262), PIPE_R = 5.5;
+const pipeCut = new THREE.Plane(new THREE.Vector3(0, 0, 1), 262);
+meshes[336].material.clippingPlanes = [plane, pipeCut];
+const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xc98a4a, metalness: 0.6, roughness: 0.35, clippingPlanes: [plane] });
+let bridge = null;
+function connectPipes() {
+  if (bridge) { scene.remove(bridge); bridge.geometry.dispose(); bridge = null; }
+  scene.updateMatrixWorld(true);
+  const fit = meshes[323];
+  const a = PIPE_PORT.clone().applyMatrix4(fit.matrixWorld);
+  const dir = new THREE.Vector3(0, 0, 1).transformDirection(fit.matrixWorld);
+  const b = PIPE_CUT.clone(), bin = new THREE.Vector3(0, 0, 1);
+  const L = Math.max(20, a.distanceTo(b) * 0.35);
+  const curve = new THREE.CubicBezierCurve3(a, a.clone().addScaledVector(dir, L), b.clone().addScaledVector(bin, -L), b);
+  bridge = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, PIPE_R, 16, false), bridgeMat);
+  bridge.userData.bridge = true; scene.add(bridge);
+  window.__bridge = { from: a.toArray().map(v => +v.toFixed(1)), to: b.toArray(), len: +curve.getLength().toFixed(1) };
+}
+function clampToFrame() {
+  scene.updateMatrixWorld(true);
+  const PLATE_TOP = HOUSING_BOTTOM + 1.5; window.__lowered = []; window.__tooTall = [];
+  meshes.forEach(m => { if (!m.visible || FRAME_IDS.includes(m.userData.i) || PUMP.includes(m)) return;
+    const b = new THREE.Box3().setFromObject(m); if (b.max.y <= FRAME_TOP + 0.01) return;
+    const need = b.max.y - FRAME_TOP, room = Math.max(0, b.min.y - PLATE_TOP);
+    m.position.y -= Math.min(need, room); window.__lowered.push(m.userData.i);
+    if (need > room + 0.01) window.__tooTall.push(m.userData.i); });
+  scene.updateMatrixWorld(true);
+}
+function snapPlateToMotor() {
+  if (!document.getElementById('pSnap').checked) return;
+  scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3(); MOTOR.forEach(m => bb.union(new THREE.Box3().setFromObject(m)));
+  const t = pv('pT'), set = (id, v) => document.getElementById(id).value = v;
+  const floorY = HOUSING_BOTTOM;
+  set('pR', 90);
+  set('pX', Math.round((bb.min.x + bb.max.x) / 2));
+  set('pZ', Math.round(bb.max.z + t / 2));
+  set('pW', Math.round(bb.max.x - bb.min.x + 20));
+  set('pY', floorY);
+  set('pH', Math.max(10, Math.round(bb.max.y - floorY)));
+  set('pFd', 1);
+  updatePlate();
+}
+document.getElementById('pSnap').addEventListener('input', snapPlateToMotor);
+updatePlate();
+document.getElementById('pCopy').onclick = () => {
+  const txt = `豎板：前後 ${pv('pX')}、左右 ${pv('pZ')}、寬 ${pv('pW')}、高 ${pv('pH')}、底部離地 ${pv('pY')}、厚 ${pv('pT')}、旋轉 ${pv('pR')}°、L底腳 ${pv('pF')}mm ${pv('pFd') > 0 ? '往右' : '往左'}；右側L角鐵 立邊${pv('aH')}、底邊${pv('aF')}、寬${pv('aW')}、厚${pv('aT')}${document.getElementById('aOn').checked ? '' : '(隱藏)'}；馬達旋轉 ${pv('motorRot')}°、馬達滾轉 ${pv('motorRoll')}°、泵頭轉向 ${pv('pumpRoll')}°`;
+  try { navigator.clipboard.writeText(txt); } catch (e) {}
+  document.getElementById('info').textContent = '已複製：' + txt;
+};
+['redo', 'sLen', 'sH', 'sUp', 'motorRot', 'motorRoll'].forEach(id => document.getElementById(id).addEventListener('input', rebuild));
+document.getElementById('bBase').addEventListener('click', rebuild);
+document.getElementById('eOn').addEventListener('input', e => redoGroup.children.forEach(o => { if (o.userData.endWall) o.visible = e.target.checked; }));
+document.getElementById('motorRot').addEventListener('input', snapPlateToMotor);
+['redo', 'sLen', 'sH', 'sUp', 'motorRot', 'motorRoll', 'mAttach'].forEach(id => document.getElementById(id).addEventListener('input', attachMotor));
+document.getElementById('mLow').addEventListener('input', () => { rebuild(); attachMotor(); });
+document.getElementById('pumpRoll').addEventListener('input', () => { document.getElementById('pumpAuto').checked = false; clockPump(); clampToFrame(); });
+document.getElementById('pumpAuto').addEventListener('input', () => { clockPump(); clampToFrame(); });
+document.getElementById('mAttach').addEventListener('input', rebuild);
+rebuild();
+const SKIN_IDS = [669, 670, 671, 688, 689, 690, 729, 730];
+function woodTex() {
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 512; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, '#B27A48'); gr.addColorStop(.5, '#A06C3F'); gr.addColorStop(1, '#8C5E36');
+  g.fillStyle = gr; g.fillRect(0, 0, 2048, 512);
+  for (let i = 0; i < 340; i++) { const y = Math.random() * 512, a = .04 + Math.random() * .2;
+    g.strokeStyle = Math.random() > .45 ? `rgba(38,21,11,${a})` : `rgba(152,104,63,${a * .7})`; g.lineWidth = .4 + Math.random() * 3.4; g.beginPath(); g.moveTo(0, y);
+    for (let x = 0; x <= 2048; x += 18) g.lineTo(x, y + Math.sin(x * .009 + i * .6) * 9 + Math.sin(x * .043 + i) * 2.5); g.stroke(); }
+  for (let k = 0; k < 4; k++) { const cx = 2048 * (.15 + k * .24), cy = 256;
+    for (let j = 0; j < 20; j++) { g.strokeStyle = `rgba(34,19,10,${.11 - j * .005})`; g.lineWidth = 1.6; g.beginPath(); g.ellipse(cx, cy, 10 + j * 13, 5 + j * 5, 0, 0, 7); g.stroke(); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+  t.repeat.set(1 / 600, 1 / 150); return t;
+}
+const walnut = new THREE.MeshPhysicalMaterial({ color: 0x8fa89c, roughness: .62, metalness: .15, clearcoat: .15, clearcoatRoughness: .5, side: THREE.DoubleSide });
+const woodGroup = new THREE.Group(); scene.add(woodGroup);
+function frontOpenings() {
+  scene.updateMatrixWorld(true); const res = [];
+  for (const i of [537]) { const m = meshes[i]; if (!m) continue; const p = m.geometry.attributes.position, v = new THREE.Vector3();
+    let n = 0, sy = 0, sz = 0; for (let k = 0; k < p.count; k++) { v.fromBufferAttribute(p, k).applyMatrix4(m.matrixWorld); if (v.x > 262) { n++; sy += v.y; sz += v.z; } }
+    if (n) res.push({ y: sy / n, z: sz / n, i }); }
+  return res;
+}
+function woodPiece(nu, nv, outerP, innerP, keep, uvLen) {
+  const pos = [], uv = [], idx = [];
+  const add = (p, s, tt) => { pos.push(p.x, p.y, p.z); uv.push(s, tt); return pos.length / 3 - 1; };
+  const K = (i, j) => i >= 0 && j >= 0 && i < nu && j < nv && keep((i + .5) / nu, (j + .5) / nv);
+  const quad = (a, b, c, d) => idx.push(a, b, c, a, c, d);
+  for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+    if (!K(i, j)) continue;
+    const u0 = i / nu, u1 = (i + 1) / nu, v0 = j / nv, v1 = (j + 1) / nv;
+    const P = (f, u, v) => f(u, v), su = u => u * uvLen, sv = v => v * 140;
+    quad(add(P(outerP, u0, v0), su(u0), sv(v0)), add(P(outerP, u1, v0), su(u1), sv(v0)), add(P(outerP, u1, v1), su(u1), sv(v1)), add(P(outerP, u0, v1), su(u0), sv(v1)));
+    quad(add(P(innerP, u0, v0), su(u0), sv(v0)), add(P(innerP, u0, v1), su(u0), sv(v1)), add(P(innerP, u1, v1), su(u1), sv(v1)), add(P(innerP, u1, v0), su(u1), sv(v0)));
+    const wall = (ua, va, ub, vb) => { const a = P(outerP, ua, va), b = P(outerP, ub, vb), c = P(innerP, ub, vb), d = P(innerP, ua, va);
+      const L = Math.hypot(a.x - d.x, a.y - d.y, a.z - d.z);
+      quad(add(a, su(ua), 0), add(b, su(ub), 0), add(c, su(ub), L), add(d, su(ua), L)); };
+    if (!K(i, j - 1)) wall(u1, v0, u0, v0);
+    if (!K(i, j + 1)) wall(u0, v1, u1, v1);
+    if (!K(i - 1, j)) wall(u0, v0, u0, v1);
+    if (!K(i + 1, j)) wall(u1, v1, u1, v0);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+function skinSection(y) {
+  const pts = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (const i of SKIN_IDS) { const g = meshes[i].geometry, p = g.attributes.position, ix = g.index;
+    for (let k = 0; k < ix.count; k += 3) { a.fromBufferAttribute(p, ix.getX(k)); b.fromBufferAttribute(p, ix.getX(k + 1)); c.fromBufferAttribute(p, ix.getX(k + 2));
+      for (const [u, v] of [[a, b], [b, c], [c, a]]) { if ((u.y - y) * (v.y - y) > 0 || u.y === v.y) continue;
+        const f = (y - u.y) / (v.y - u.y); pts.push([u.x + (v.x - u.x) * f, u.z + (v.z - u.z) * f]); } } }
+  pts.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const cr = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]); const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of pts.slice().reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function rayHit(poly, th) {
+  const dx = Math.cos(th), dz = Math.sin(th); let best = 0;
+  for (let k = 0; k < poly.length; k++) { const [x1, z1] = poly[k], [x2, z2] = poly[(k + 1) % poly.length];
+    const ex = x2 - x1, ez = z2 - z1, den = dx * ez - dz * ex; if (Math.abs(den) < 1e-9) continue;
+    const tt = (x1 * ez - z1 * ex) / den, s = (x1 * dz - z1 * dx) / den; if (tt > 0 && s >= -1e-6 && s <= 1 + 1e-6) best = Math.max(best, tt); }
+  return best;
+}
+function offsetPoly(poly, o) {
+  if (!o) return poly;
+  const n = poly.length, nrm = [];
+  for (let k = 0; k < n; k++) { const [x1, z1] = poly[k], [x2, z2] = poly[(k + 1) % n], L = Math.hypot(x2 - x1, z2 - z1) || 1;
+    let nx = (z2 - z1) / L, nz = -(x2 - x1) / L; if (nx * (x1 + x2) + nz * (z1 + z2) < 0) { nx = -nx; nz = -nz; } nrm.push([nx, nz]); }
+  return poly.map(([x, z], k) => { const a = nrm[(k + n - 1) % n], b = nrm[k]; let mx = a[0] + b[0], mz = a[1] + b[1]; const L = Math.hypot(mx, mz) || 1;
+    mx /= L; mz /= L; const c = Math.max(.5, mx * b[0] + mz * b[1]); return [x + mx * o / c, z + mz * o / c]; });
+}
+const _ringsCache = {};
+function woodRings(NV, NU, Oset) {
+  const O = Oset ?? pv('wO'), Ox = Oset ?? pv('wOx'), key = [NV, NU, pv('wF'), pv('wCt'), pv('wCb'), O, Ox, pv('wS'), pv('wB')].join();
+  if (_ringsCache[key]) return _ringsCache[key];
+  if (Object.keys(_ringsCache).length > 6) for (const k in _ringsCache) delete _ringsCache[k];
+  const Yb = HOUSING_BOTTOM + 1.5, Yt = 250.5, rings = [], base = [], bot = offsetPoly(frameBottomHull(), O), top = offsetPoly(skinSection(Yt - 1), O);
+  const s = v => 1 - Math.pow(1 - v, 1.6), SL = pv('wS'), SB = pv('wB');
+  const RF = pv('wF'), RT = 6, Rc0 = pv('wCt'), Rc1 = pv('wCb');
+  const rr = (A, B, r, th) => { const c = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)); r = Math.min(r, A - 1, B - 1);
+    let t = Math.min(c > 1e-9 ? A / c : 1e9, sn > 1e-9 ? B / sn : 1e9); const x = t * c, z = t * sn;
+    if (x > A - r && z > B - r) { const cx = A - r, cz = B - r, uc = c * cx + sn * cz; t = uc + Math.sqrt(Math.max(0, uc * uc - cx * cx - cz * cz + r * r)); }
+    return t; };
+  for (let j = 0; j <= NV; j++) { const v = Math.pow(j / NV, 1.7), y = Yb + (Yt - Yb) * v, h = y - Yb, ht = Yt - y, r = [], rb = [];
+    const eB = h < RF ? RF - Math.sqrt(Math.max(0, RF * RF - (RF - h) * (RF - h))) : 0;
+    const eT = ht < RT ? RT - Math.sqrt(Math.max(0, RT * RT - (RT - ht) * (RT - ht))) : 0, e = eB + eT;
+    if (j === 0) window.__frontInset = +(Math.max(rayHit(top, 0), rayHit(top, Math.PI)) - Math.max(rayHit(bot, 0), rayHit(bot, Math.PI))).toFixed(0);
+    const dA = th => { const d0 = rayHit(bot, th), d1 = rayHit(top, th); return d0 + (d1 - d0) * s(v); };
+    const A1 = Math.max(rayHit(top, 0), rayHit(top, Math.PI)) + (Ox - O), A = A1 - SB * (1 - s(v)), B1 = Math.max(rayHit(top, Math.PI / 2), rayHit(top, -Math.PI / 2)), B = B1 - SL * (1 - s(v));
+    const Rc = Rc0 + (Rc1 - Rc0) * Math.pow(1 - v, 1.5);
+    for (let i = 0; i <= NU; i++) { const th = -Math.PI + 2 * Math.PI * i / NU, d = rr(A, B, Rc, th);
+      rb.push(new THREE.Vector3(d * Math.cos(th), y, d * Math.sin(th))); r.push(new THREE.Vector3((d - e) * Math.cos(th), y, (d - e) * Math.sin(th))); }
+    rings.push(r); base.push(rb); }
+  const outerAt = (th, y) => { let j = 0; while (j < NV && rings[j + 1][0].y < y) j++; const i = Math.round((th + Math.PI) / (2 * Math.PI) * NU) % (NU + 1);
+    const p = rings[j][i]; return Math.hypot(p.x, p.z); };
+  const botRing = base[0].map(p => [p.x, p.z]);
+  return (_ringsCache[key] = { NV, NU, RF, Rc0, Rc1, O, Ox, SL, rings, base, outerAt, botRing });
+}
+function woodClip(RR, th, y0, y1, t, span) {
+  const P = [], NV = RR.NV, ys = [];
+  for (let j = 0; j <= NV; j++) { const y = RR.base[j][0].y; if (y >= y0 - 8 && y <= y1 + 8) ys.push(j); }
+  const pick = ys.length > 7 ? [0, 1, 2, 3, 4, 5, 6].map(k => ys[Math.round(k * (ys.length - 1) / 6)]) : ys;
+  const h = (j, ux, uz) => { let m = -1e9; for (const q of RR.base[j]) m = Math.max(m, q.x * ux + q.z * uz); return m - t; };
+  const nd = Math.max(1, Math.min(16, Math.ceil(2 * span / .2))), pk = nd > 8 ? pick.filter((_, k) => k % 2 === 0 || k === pick.length - 1) : pick;
+  for (let k = 0; k <= nd; k++) { const a = th - span + 2 * span * k / nd, ux = Math.cos(a), uz = Math.sin(a);
+    for (const j of pk) { const ja = Math.max(0, j - 1), jb = Math.min(NV, j + 1), ya = RR.base[ja][0].y, yb = RR.base[jb][0].y;
+      const sl = (h(jb, ux, uz) - h(ja, ux, uz)) / (yb - ya || 1), y = RR.base[j][0].y, n = new THREE.Vector3(-ux, sl, -uz), L = n.length();
+      P.push(new THREE.Plane(n.divideScalar(L), (h(j, ux, uz) - sl * y) / L)); } }
+  return P;
+}
+function clipEndWalls() {
+  const on = document.getElementById('woodOn').checked, RR = on ? woodRings(40, 720, 0) : null, t = pv('wT');
+  redoGroup.children.forEach(e => { if (e.userData.endWall === undefined) return;
+    e.material.clippingPlanes = e.userData.baseClip.slice();
+    e.material.needsUpdate = true; });
+}
+const PAD_IDS = [672, 673, 691, 692, 686];
+function padPlane(m) {
+  if (!m) return null; m.updateMatrixWorld(true); const g = m.geometry, p = g.attributes.position, ix = g.index, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const bb = new THREE.Box3().setFromObject(m), sx = Math.sign(bb.min.x + bb.max.x), A = {};
+  for (let k = 0; k < ix.count; k += 3) { a.fromBufferAttribute(p, ix.getX(k)).applyMatrix4(m.matrixWorld); b.fromBufferAttribute(p, ix.getX(k + 1)).applyMatrix4(m.matrixWorld); c.fromBufferAttribute(p, ix.getX(k + 2)).applyMatrix4(m.matrixWorld);
+    const n = new THREE.Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)), ar = n.length() / 2; if (ar < 1e-6) continue; n.normalize();
+    if (n.x * sx < .8) continue; const key = [n.x, n.y, n.z].map(v => Math.round(v * 20)).join();
+    const e = A[key] || (A[key] = { ar: 0, n: new THREE.Vector3(), d: -1e9 }); e.ar += ar; e.n.addScaledVector(n, ar); e.d = Math.max(e.d, n.dot(a), n.dot(b), n.dot(c)); }
+  const best = Object.values(A).sort((x, y) => y.ar - x.ar)[0]; if (!best) return null;
+  const n = best.n.normalize(); let d = -1e9; for (let k = 0; k < p.count; k++) { a.fromBufferAttribute(p, k).applyMatrix4(m.matrixWorld); d = Math.max(d, n.dot(a)); }
+  return { id: m.userData.i, sx, n, d, z0: bb.min.z - 6, z1: bb.max.z + 6 };
+}
+function buildWood() {
+  woodGroup.clear();
+  const on = document.getElementById('woodOn').checked, t = pv('wT');
+  document.getElementById('vWt').textContent = `${t} mm`;
+  SKIN_IDS.forEach(i => meshes[i].visible = !on);
+  meshes.forEach(mm => { if (mm.userData.origClip) { mm.material.clippingPlanes = mm.userData.origClip; delete mm.userData.origClip; mm.material.needsUpdate = true; } });
+  redoGroup.children.forEach(o => { if (o.isMesh && o.geometry.type === 'ExtrudeGeometry' && !o.userData.boxPart) o.visible = true; });
+  if (!on) return;
+  const NV = 40, NU = 720, { rings, base } = woodRings(NV, NU);
+  document.getElementById('vWf').textContent = `R${pv('wF')}`; document.getElementById('vWct').textContent = `R${pv('wCt')}`; document.getElementById('vWcb').textContent = `R${pv('wCb')}`;
+  document.getElementById('vWb').textContent = `${pv('wB')} mm`;
+  document.getElementById('vWs').textContent = `${pv('wS')} mm（前後約 ${window.__frontInset ?? '?'}）`;
+  document.getElementById('vWo').textContent = `${pv('wO') > 0 ? '+' : ''}${pv('wO')} mm`;
+  { let gmin = 1e9; for (const pd of PAD_IDS.map(id => padPlane(meshes[id])).filter(Boolean)) { const bb = new THREE.Box3().setFromObject(meshes[pd.id]);
+      for (let j = 0; j <= NV; j++) { const y = base[j][0].y; if (y < bb.min.y || y > bb.max.y) continue; let xo = -1e9;
+        for (const q of base[j]) if (Math.sign(q.x) === pd.sx && q.z >= bb.min.z && q.z <= bb.max.z) xo = Math.max(xo, Math.abs(q.x));
+        if (xo < -1e8) continue; const xp = Math.abs((pd.d - pd.n.y * y - pd.n.z * (bb.min.z + bb.max.z) / 2) / pd.n.x); gmin = Math.min(gmin, xo - t - xp); } }
+    window.__ironGap = +gmin.toFixed(1);
+    document.getElementById('vWox').textContent = `${pv('wOx') > 0 ? '+' : ''}${pv('wOx')} mm（鐵件到外殼內側 ${gmin.toFixed(1)} mm${gmin <= 0.5 ? '，已碰到' : ''}）`; }
+  const inner = base.map(r => r.map((p, i) => { const a = r[(i + NU - 1) % NU], b = r[(i + 1) % NU];
+    const tx = b.x - a.x, tz = b.z - a.z, L = Math.hypot(tx, tz) || 1; return new THREE.Vector3(p.x + (-tz / L) * t * -1, p.y, p.z + (tx / L) * t * -1); }));
+  const chk = inner[0][0].length() > base[0][0].length() ? -1 : 1;
+  const pads = PAD_IDS.map(id => padPlane(meshes[id])).filter(Boolean); window.__pads = pads.map(q => ({ id: q.id, z: [q.z0, q.z1], n: q.n.toArray().map(v => +v.toFixed(3)), d: +q.d.toFixed(1) }));
+  const innerP0 = (u, v) => { const i = Math.min(NU, Math.round(u * NU)), j = Math.min(NV, Math.round(v * NV)), p = base[j][i], q = inner[j][i];
+    return chk === 1 ? q.clone() : new THREE.Vector3(2 * p.x - q.x, q.y, 2 * p.z - q.z); };
+  const jRef = Math.round(NV * .6);
+  const innerP = (u, v) => { const q = innerP0(u, v), iu = Math.min(NU, Math.round(u * NU)), r = base[jRef][iu];
+    for (const pd of pads) { if (Math.sign(r.x) !== pd.sx || Math.abs(r.x) < 150 || r.z < pd.z0 || r.z > pd.z1) continue;
+      const o = base[Math.min(NV, Math.round(v * NV))][iu];
+      const xp = (pd.d - pd.n.y * q.y - pd.n.z * q.z) / pd.n.x;
+      q.x = pd.sx > 0 ? Math.min(xp, o.x - 3) : Math.max(xp, o.x + 3); }
+    return q; };
+  const outerP = (u, v) => rings[Math.min(NV, Math.round(v * NV))][Math.min(NU, Math.round(u * NU))].clone();
+  const holes = frontOpenings();
+  const keep = (u, v) => { const p = outerP(u, v); return !(p.x > 150 && holes.some(o => Math.abs(p.z - o.z) < 32 && Math.abs(p.y - o.y) < 26)); };
+  const per = 2 * (535 + 908);
+  const m = new THREE.Mesh(woodPiece(NU, NV, outerP, innerP, keep, per), walnut); m.userData.wood = 'shell'; woodGroup.add(m);
+  { const ring = rings[0], hole = offsetPoly(frameBottomHull(), -6);
+    const hr = []; let gap = 0; for (let i = 0; i < NU; i += 2) { const p = ring[i], th = Math.atan2(p.z, p.x), ro = Math.hypot(p.x, p.z) - .5, rh = Math.min(rayHit(hole, th), ro - 1.5);
+      gap = Math.max(gap, ro - rayHit(hole, th) - 6); hr.push([rh * Math.cos(th), rh * Math.sin(th)]); }
+    const ok = gap > .5;
+    if (ok) { const sh = new THREE.Shape(); ring.slice(0, NU).forEach((p, k) => { const L = Math.hypot(p.x, p.z), f = (L - .5) / L; k ? sh.lineTo(p.x * f, p.z * f) : sh.moveTo(p.x * f, p.z * f); }); sh.closePath();
+      const hp = new THREE.Path(); hr.slice().reverse().forEach(([x, z], k) => k ? hp.lineTo(x, z) : hp.moveTo(x, z)); hp.closePath(); sh.holes.push(hp);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 4, bevelEnabled: false, curveSegments: 4 }); g.rotateX(Math.PI / 2); g.translate(0, 4, 0);
+      const lip = new THREE.Mesh(g, walnut); lip.position.y = HOUSING_BOTTOM + 1.6; lip.userData.wood = 'lip'; woodGroup.add(lip); } window.__lip = ok; }
+  { const RR = woodRings(NV, NU, 0), q = new THREE.Vector3(), skip = new Set([...SKIN_IDS, 536, 537, 186]); scene.updateMatrixWorld(true); window.__trimmed = [];
+    meshes.forEach(mm => { if (!mm.visible || skip.has(mm.userData.i)) return; const bb = new THREE.Box3().setFromObject(mm);
+      if (bb.max.y < 113 || bb.min.y > 249) return; if (!(bb.max.x > 170 || bb.min.x < -170 || bb.max.z > 380 || bb.min.z < -380)) return;
+      const pa = mm.geometry.attributes.position; let worst = 0, wx = 0, wz = 0, wy = 0; const ths = [];
+      for (let k = 0; k < pa.count; k++) { q.fromBufferAttribute(pa, k).applyMatrix4(mm.matrixWorld); if (q.y < 113 || q.y > 249) continue;
+        const th = Math.atan2(q.z, q.x), L = Math.hypot(q.x, q.z), over = L - (RR.outerAt(th, q.y) - 1); if (over > 0) ths.push(th); if (over > worst) { worst = over; wx = q.x; wz = q.z; wy = q.y; } }
+      if (worst <= 0) return;
+      const th0 = Math.atan2(wz, wx); let span = .3; for (const a of ths) span = Math.max(span, Math.abs(Math.atan2(Math.sin(a - th0), Math.cos(a - th0))) + .15); span = Math.min(span, Math.PI);
+      if (!mm.userData.origClip) mm.userData.origClip = mm.material.clippingPlanes;
+      mm.material.clippingPlanes = [plane, ...woodClip(RR, th0, bb.min.y, bb.max.y, t, span)]; mm.material.needsUpdate = true;
+      window.__trimmed.push([mm.userData.i, +worst.toFixed(1)]); }); }
+  clipEndWalls();
+  { const pm = meshes[186], pa = pm.geometry.attributes.position, q = new THREE.Vector3(); scene.updateMatrixWorld(true);
+    let n = 0, sy = 0, sz = 0; for (let k = 0; k < pa.count; k++) { q.fromBufferAttribute(pa, k).applyMatrix4(pm.matrixWorld); if (q.x > 230) { n++; sy += q.y; sz += q.z; } }
+    const yy = n ? sy / n : 170, zz = n ? sz / n : -150;
+    const j = Math.max(0, Math.min(NV, Math.round((yy - (HOUSING_BOTTOM + 1.5)) / (250.5 - HOUSING_BOTTOM - 1.5) * NV)));
+    const i = Math.round((Math.atan2(zz, 240) + Math.PI) / (2 * Math.PI) * NU), xin = woodRings(NV, NU, 0).base[j][i].x - t - 1;
+    pm.material.clippingPlanes = [plane, new THREE.Plane(new THREE.Vector3(-1, 0, 0), xin)];
+    pm.material.needsUpdate = true; window.__pipeCut = { xin: +xin.toFixed(1), y: +yy.toFixed(1), z: +zz.toFixed(1) }; }
+}
+['woodOn', 'wT', 'wF', 'wCt', 'wCb', 'wO', 'wOx', 'wS', 'wB'].forEach(id => document.getElementById(id).addEventListener('input', buildWood));
+const knobRod = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 1, 24), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: .8, roughness: .35, clippingPlanes: [plane] }));
+knobRod.rotation.z = Math.PI / 2; scene.add(knobRod);
+function placeKnob() {
+  const k = meshes[537], d = pv('kOut'); if (!k) return;
+  k.position.x = 0; k.updateMatrixWorld(true); const b0 = new THREE.Box3().setFromObject(k);
+  k.position.x = d; k.updateMatrixWorld(true);
+  const cy = (b0.min.y + b0.max.y) / 2, cz = (b0.min.z + b0.max.z) / 2;
+  knobRod.visible = d > 0; knobRod.scale.y = Math.max(d, .01); knobRod.position.set(b0.min.x + d / 2, cy, cz);
+  let txt = `${d} mm`;
+  if (document.getElementById('woodOn').checked) { const RR = woodRings(40, 720), th = Math.atan2(cz, b0.max.x), wx = RR.outerAt(th, cy) * Math.cos(th);
+    txt += `（旋鈕露出外殼面 ${(b0.max.x + d - wx).toFixed(0)} mm）`; window.__knob = { front: +(b0.max.x + d).toFixed(1), wood: +wx.toFixed(1) }; }
+  document.getElementById('vKo').textContent = txt;
+}
+document.getElementById('kOut').addEventListener('input', placeKnob);
+const GOLD_IDS = [731, 740, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759];
+const STEEL_IDS = [706, 708, 713, 714, 719, 720];
+const goldMat = new THREE.MeshPhysicalMaterial({ color: 0xC3AFA2, metalness: .9, roughness: .35, clearcoat: .4, clearcoatRoughness: .35, side: THREE.DoubleSide, clippingPlanes: [plane] });
+const steelBMat = new THREE.MeshPhysicalMaterial({ color: 0xB4B8BC, metalness: 1, roughness: .3, side: THREE.DoubleSide, clippingPlanes: [plane] });
+const envTex = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+goldMat.envMap = envTex; goldMat.envMapIntensity = 1.0; steelBMat.envMap = envTex; steelBMat.envMapIntensity = 0.9;
+walnut.envMap = envTex; walnut.envMapIntensity = 0.35;
+GOLD_IDS.forEach(i => meshes[i].material = goldMat.clone());
+STEEL_IDS.forEach(i => meshes[i].material = steelBMat.clone());
+document.getElementById('bBase').addEventListener('click', buildWood);
+snapPlateToMotor();
+attachMotor();
+clampToFrame();
+buildWood();
+document.getElementById('ui').addEventListener('input', () => { clampToFrame(); clipEndWalls(); placeKnob(); });
+placeKnob();
+document.getElementById('bBase').addEventListener('click', () => { clampToFrame(); placeKnob(); });
+const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2(); let down = null;
+canvas.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
+canvas.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  mouse.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(meshes.filter(m => m.visible)).filter(h => plane.distanceToPoint(h.point) >= 0);
+  if (!hits.length) return;
+  const m = hits[0].object; const s = m.userData.size;
+  document.getElementById('info').textContent = `零件：${s[0]} × ${s[1]} × ${s[2]} mm`;
+  if (window.__sel && window.__sel !== m) window.__sel.material.emissive.setHex(0);
+  window.__sel = m; m.material.emissive.setHex(0x1f8f1f);
+});
+const SS = 2.4;
+const SHEET_PX = SS / 2;
+const VIEWS = {
+  front: { dir: [1, 0, 0], up: [0, 1, 0], name: '正視圖' },
+  top:   { dir: [0, 1, 0], up: [-1, 0, 0], name: '上視圖' },
+  right: { dir: [0, 0, -1], up: [0, 1, 0], name: '右側視圖' },
+};
+function visMeshes() { const out = []; scene.traverseVisible(o => { if (o.isMesh) out.push(o); }); return out; }
+function renderView(view, list) {
+  const d = new THREE.Vector3(...view.dir), up = new THREE.Vector3(...view.up), right = new THREE.Vector3().crossVectors(d.clone().negate(), up);
+  scene.updateMatrixWorld(true);
+  const bb = new THREE.Box3(); list.forEach(m => bb.union(new THREE.Box3().setFromObject(m)));
+  const c = bb.getCenter(new THREE.Vector3());
+  let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+  for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+    const p = new THREE.Vector3(x, y, z); u0 = Math.min(u0, p.dot(right)); u1 = Math.max(u1, p.dot(right)); v0 = Math.min(v0, p.dot(up)); v1 = Math.max(v1, p.dot(up)); }
+  u0 -= 5; u1 += 5; v0 -= 5; v1 += 5;
+  const W = Math.ceil((u1 - u0) * SS), H = Math.ceil((v1 - v0) * SS), R = bb.getSize(new THREE.Vector3()).length() + 100;
+  const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
+  const cam = new THREE.OrthographicCamera(-(u1 - u0) / 2, (u1 - u0) / 2, (v1 - v0) / 2, -(v1 - v0) / 2, 1, R * 3);
+  const look = c.clone().addScaledVector(right, uc - c.dot(right)).addScaledVector(up, vc - c.dot(up));
+  cam.up.copy(up); cam.position.copy(look).addScaledVector(d, R * 1.5); cam.lookAt(look); cam.updateMatrixWorld(true);
+  const keepBg = scene.background, sel = window.__sel, selHex = sel ? sel.material.emissive.getHex() : 0;
+  if (sel) sel.material.emissive.setHex(0);
+  const read = rt => { const px = new Uint8Array(W * H * 4); renderer.setRenderTarget(rt); renderer.setClearColor(0xffffff, 1); renderer.clear(); renderer.render(scene, cam);
+    renderer.readRenderTargetPixels(rt, 0, 0, W, H, px); renderer.setRenderTarget(null); rt.dispose(); return px; };
+  scene.background = null;
+  const rtC = new THREE.WebGLRenderTarget(W, H); rtC.texture.colorSpace = THREE.SRGBColorSpace;
+  const col = read(rtC);
+  const saved = list.map(m => m.material);
+  list.forEach((m, k) => { const src = Array.isArray(m.material) ? m.material[0] : m.material, n = k + 1;
+    const mt = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, clippingPlanes: src.clippingPlanes || null, toneMapped: false });
+    mt.color.setRGB((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255, THREE.LinearSRGBColorSpace); m.material = mt; });
+  renderer.setClearColor(0x000000, 1);
+  const rtI = new THREE.WebGLRenderTarget(W, H), ids = new Uint8Array(W * H * 4);
+  renderer.setRenderTarget(rtI); renderer.clear(); renderer.render(scene, cam); renderer.readRenderTargetPixels(rtI, 0, 0, W, H, ids); renderer.setRenderTarget(null); rtI.dispose();
+  list.forEach((m, k) => { m.material.dispose(); m.material = saved[k]; });
+  scene.background = keepBg; renderer.setClearColor(0x000000, 1); if (sel) sel.material.emissive.setHex(selHex);
+  const id = (x, y) => { const o = ((H - 1 - y) * W + x) * 4; return ids[o] << 16 | ids[o + 1] << 8 | ids[o + 2]; };
+  const out = new ImageData(W, H), od = out.data; let x0 = W, x1 = -1, y0 = H, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const a = id(x, y), o = (y * W + x) * 4, s = ((H - 1 - y) * W + x) * 4;
+    if (a) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const edge = (x + 1 < W && id(x + 1, y) !== a) || (y + 1 < H && id(x, y + 1) !== a) || (x > 0 && id(x - 1, y) !== a) || (y > 0 && id(x, y - 1) !== a);
+    if (edge && (a || x + 1 < W && id(x + 1, y) || y + 1 < H && id(x, y + 1) || x > 0 && id(x - 1, y) || y > 0 && id(x, y - 1))) { od[o] = od[o + 1] = od[o + 2] = 25; }
+    else if (!a) { od[o] = od[o + 1] = od[o + 2] = 255; }
+    else for (let k = 0; k < 3; k++) od[o + k] = 255 - (255 - col[s + k]) * 0.5;
+    od[o + 3] = 255; }
+  if (x1 < 0) return null;
+  x0 = Math.max(0, x0 - 3); y0 = Math.max(0, y0 - 3); x1 = Math.min(W - 1, x1 + 3); y1 = Math.min(H - 1, y1 + 3);
+  const full = document.createElement('canvas'); full.width = W; full.height = H; full.getContext('2d').putImageData(out, 0, 0);
+  const cw = Math.round((x1 - x0 + 1) / 2), ch = Math.round((y1 - y0 + 1) / 2), cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+  const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(full, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0, 0, cw, ch);
+  const mm = p => p / SS;
+  return { cv, U0: u0 + mm(x0 + 3), U1: u0 + mm(x1 - 2), V1: v1 - mm(y0 + 3), V0: v1 - mm(y1 - 2), cam, W, H, u0, v1, right, up };
+}
+function dimH(g, xa, xb, y, yRef, txt) {
+  g.save(); g.strokeStyle = '#1f4fa8'; g.fillStyle = '#1f4fa8'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(xa, yRef); g.lineTo(xa, y + 6); g.moveTo(xb, yRef); g.lineTo(xb, y + 6); g.moveTo(xa, y); g.lineTo(xb, y); g.stroke();
+  for (const [x, s] of [[xa, 1], [xb, -1]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + 9 * s, y - 3.5); g.lineTo(x + 9 * s, y + 3.5); g.fill(); }
+  g.font = 'bold 15px "Microsoft JhengHei",Arial'; g.textAlign = 'center'; g.textBaseline = 'bottom';
+  const w = g.measureText(txt).width + 8; g.fillStyle = '#fff'; g.fillRect((xa + xb) / 2 - w / 2, y - 19, w, 17); g.fillStyle = '#1f4fa8'; g.fillText(txt, (xa + xb) / 2, y - 3); g.restore();
+}
+function dimV(g, ya, yb, x, xRef, txt) {
+  g.save(); g.translate(x, (ya + yb) / 2); g.rotate(-Math.PI / 2); g.translate(-x, -(ya + yb) / 2);
+  const h = (yb - ya) / 2, c = (ya + yb) / 2; dimH(g, x - h, x + h, c, c + (xRef - x), txt); g.restore();
+}
+function titleBlock(g, Wd, Hd, title, lines) {
+  const w = 420, h = 30 + lines.length * 20, x = Wd - w - 20, y = Hd - h - 20;
+  g.save(); g.strokeStyle = '#222'; g.lineWidth = 1.5; g.strokeRect(x, y, w, h); g.beginPath(); g.moveTo(x, y + 30); g.lineTo(x + w, y + 30); g.stroke();
+  g.fillStyle = '#111'; g.font = 'bold 17px "Microsoft JhengHei",Arial'; g.textBaseline = 'middle'; g.fillText(title, x + 10, y + 15);
+  g.font = '13px "Microsoft JhengHei",Arial'; lines.forEach((t, k) => g.fillText(t, x + 10, y + 40 + k * 20)); g.restore();
+}
+function stamp() { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function stateLine() {
+  return document.getElementById('woodOn').checked ? `外殼：厚 ${pv('wT')}、往外 左右${pv('wO')}/前後${pv('wOx')}、斜度 前後${pv('wB')}/左右${pv('wS')}` : '外殼：未套用';
+}
+function drawThreeView() {
+  const list = visMeshes();
+  const F = renderView(VIEWS.front, list), T = renderView(VIEWS.top, list), Rv = renderView(VIEWS.right, list);
+  if (!F || !T || !Rv) return null;
+  const S = SHEET_PX, gap = 90, M = 60;
+  const fx = M + 70, fy = M + 40 + T.cv.height + gap;
+  const tx = fx + (T.U0 - F.U0) * S, ty = M + 40;
+  const rx = fx + F.cv.width + gap + 30, ry = fy + (F.V1 - Rv.V1) * S;
+  const Wd = Math.max(rx + Rv.cv.width + M + 40, 1100), Hd = Math.max(fy + F.cv.height, ry + Rv.cv.height) + 230;
+  const sh = document.getElementById('sheet'); sh.width = Math.round(Wd); sh.height = Math.round(Hd);
+  const g = sh.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, Wd, Hd);
+  g.strokeStyle = '#222'; g.lineWidth = 2; g.strokeRect(10, 10, Wd - 20, Hd - 20);
+  const put = (V, x, y) => { g.drawImage(V.cv, x, y); g.fillStyle = '#111'; g.font = 'bold 16px "Microsoft JhengHei",Arial'; g.textAlign = 'left'; g.textBaseline = 'bottom'; };
+  put(F, fx, fy); put(T, tx, ty); put(Rv, rx, ry);
+  g.fillStyle = '#111'; g.font = 'bold 16px "Microsoft JhengHei",Arial'; g.textBaseline = 'bottom';
+  g.fillText(VIEWS.top.name, tx, ty - 8); g.fillText(VIEWS.front.name + '（正面）', fx, fy - 8); g.fillText(VIEWS.right.name, rx, ry - 8);
+  g.save(); g.strokeStyle = '#bbb'; g.setLineDash([4, 5]); g.lineWidth = 1; g.beginPath();
+  g.moveTo(fx + F.cv.width + 8, fy + 3); g.lineTo(rx - 8, fy + 3); g.moveTo(fx + F.cv.width + 8, fy + F.cv.height - 3); g.lineTo(rx - 8, fy + F.cv.height - 3); g.stroke(); g.restore();
+  const wZ = F.U1 - F.U0, hY = F.V1 - F.V0, dX = T.V1 - T.V0;
+  const fB = fy + F.cv.height - 1.5;
+  dimH(g, fx + 1.5, fx + wZ * S + 1.5, fB + 50, fB + 4, `${Math.round(wZ)}`);
+  dimV(g, fy + 1.5, fy + hY * S + 1.5, fx - 45, fx - 4, `${Math.round(hY)}`);
+  dimV(g, ty + 1.5, ty + dX * S + 1.5, Math.min(tx, fx) - 45, tx - 4, `${Math.round(dX)}`);
+  dimH(g, rx + 1.5, rx + (Rv.U1 - Rv.U0) * S + 1.5, ry + Rv.cv.height + 50, ry + Rv.cv.height + 4, `${Math.round(Rv.U1 - Rv.U0)}`);
+  titleBlock(g, Wd, Hd, '示範機型 方殼版　外觀三視圖', [
+    `第三角法｜單位 mm｜外形：寬(左右) ${Math.round(wZ)} × 深(前後) ${Math.round(dX)} × 高 ${Math.round(hY)}`,
+    stateLine(), `底盒長 ${pv('sLen')}、高 ${pv('sH')}｜出圖時間 ${stamp()}`,
+    '示範用：模型已降低精度並改過外型，非真實產品']);
+  return '示範機型方殼版_外觀三視圖';
+}
+function drawInternalTop() {
+  const hidden = [];
+  const hide = o => { if (o.visible) { o.visible = false; hidden.push(o); } };
+  hide(woodGroup); [...FRAME_IDS, ...SKIN_IDS].forEach(i => hide(meshes[i]));
+  meshes.forEach(m => { const b = m.geometry.boundingBox; if (isT(b) || isDeck(b) || GOLD_IDS.includes(m.userData.i) || STEEL_IDS.includes(m.userData.i)) hide(m); });
+  const list = visMeshes(); let T;
+  try { T = renderView(VIEWS.top, list); } finally { hidden.forEach(o => o.visible = true); }
+  if (!T) return null;
+  const S = SHEET_PX, M = 60, labW = 300;
+  const ix = M + labW, iy = M + 50, Wd = ix + T.cv.width + labW + M, Hd = iy + T.cv.height + 230;
+  const sh = document.getElementById('sheet'); sh.width = Math.round(Wd); sh.height = Math.round(Hd);
+  const g = sh.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, Wd, Hd);
+  g.strokeStyle = '#222'; g.lineWidth = 2; g.strokeRect(10, 10, Wd - 20, Hd - 20);
+  g.drawImage(T.cv, ix, iy);
+  g.fillStyle = '#111'; g.font = 'bold 16px "Microsoft JhengHei",Arial'; g.textBaseline = 'bottom';
+  g.fillText('內部配件上視圖（拿掉外殼、外框、上蓋）　↓ 機器正面', ix, iy - 10);
+  const toPx = p => [ix + (p.dot(T.right) - T.U0) * S, iy + (T.V1 - p.dot(T.up)) * S];
+  scene.updateMatrixWorld(true);
+  const ctr = o => new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+  const named = [];
+  const add = (o, name, at) => { if (o && o.visible !== false) { let p = o; let vis = true; while (p) { if (!p.visible) vis = false; p = p.parent; } if (vis) named.push([name, at || ctr(o), o]); } };
+  add(meshes[158], '馬達'); add(meshes[164], '泵頭'); add(legV, `豎板 ${pv('pW')}×${pv('pH')} t${pv('pT')}`); add(angH, `L 角鐵 ${pv('aH')}/${pv('aF')}/${pv('aW')}`);
+  add(meshes[537], '電源旋鈕'); add(bridge, '銅管（接泵頭出口）');
+  const L2 = pv('sLen') / 2;
+  redoGroup.children.forEach(o => {
+    if (o.userData.boxPart === 'walls') add(o, `不鏽鋼底盒 382×${pv('sLen')}×${pv('sH')}`, new THREE.Vector3(-190.2, 100, -L2 * 0.4));
+    else if (o.userData.endWall === 1) add(o, '端板（兩端）', new THREE.Vector3(60, 200, 412));
+    else if (o.isMesh && o.geometry.type === 'ExtrudeGeometry' && !o.userData.boxPart && !o.userData.leg) add(o, '封底板', new THREE.Vector3(-195, 112, 300));
+  });
+  const usedIds = new Set([158, 164, 537]);
+  meshes.filter(m => m.visible && !usedIds.has(m.userData.i) && !FRAME_IDS.includes(m.userData.i) && list.includes(m))
+    .map(m => ({ m, a: m.userData.size[0] * m.userData.size[2] })).sort((p, q) => q.a - p.a).slice(0, 8)
+    .forEach(({ m }) => add(m, `零件（${m.userData.size.map(Math.round).join('×')}）`));
+  const pts = named.map(([name, p]) => { const [x, y] = toPx(p); return { name, x, y }; })
+    .filter(q => q.x >= ix - 2 && q.x <= ix + T.cv.width + 2 && q.y >= iy - 2 && q.y <= iy + T.cv.height + 2);
+  const midX = ix + T.cv.width / 2, GAPY = 24, top = iy - 10, bot = iy + T.cv.height + 10;
+  for (const side of [-1, 1]) {
+    const col = pts.filter(q => side < 0 ? q.x < midX : q.x >= midX).sort((p, q) => p.y - q.y);
+    const ys = col.map(q => q.y);
+    for (let k = 0; k < ys.length; k++) ys[k] = Math.max(ys[k], k ? ys[k - 1] + GAPY : top);
+    for (let k = ys.length - 1; k >= 0; k--) ys[k] = Math.min(ys[k], k < ys.length - 1 ? ys[k + 1] - GAPY : bot);
+    col.forEach((q, k) => {
+      const ly = ys[k], lx = side < 0 ? ix - 70 : ix + T.cv.width + 40;
+      g.strokeStyle = '#c0392b'; g.fillStyle = '#c0392b'; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(q.x, q.y); g.lineTo(lx, ly); g.stroke(); g.beginPath(); g.arc(q.x, q.y, 3.5, 0, 7); g.fill();
+      g.fillStyle = '#111'; g.font = '13px "Microsoft JhengHei",Arial'; g.textBaseline = 'middle'; g.textAlign = side < 0 ? 'right' : 'left';
+      g.fillText(q.name, lx + (side < 0 ? -4 : 4), ly);
+    });
+  }
+  g.textAlign = 'left';
+  dimH(g, ix + 1.5, ix + (T.U1 - T.U0) * S + 1.5, iy + T.cv.height + 48, iy + T.cv.height + 4, `${Math.round(T.U1 - T.U0)}`);
+  dimV(g, iy + 1.5, iy + (T.V1 - T.V0) * S + 1.5, ix - 30, ix - 4, `${Math.round(T.V1 - T.V0)}`);
+  titleBlock(g, Wd, Hd, '示範機型 方殼版　內部配件 2D 上視圖', [
+    `單位 mm｜內部範圍：左右 ${Math.round(T.U1 - T.U0)} × 前後 ${Math.round(T.V1 - T.V0)}｜圖下方＝機器正面`,
+    `馬達旋轉 ${pv('motorRot')}°、滾轉 ${pv('motorRoll')}°、泵頭 ${pv('pumpRoll')}°｜豎板 前後${pv('pX')}/左右${pv('pZ')}`,
+    `出圖時間 ${stamp()}`,
+    '示範用：模型已降低精度並改過外型，非真實產品']);
+  return '示範機型方殼版_內部配件上視圖';
+}
+let sheetName = '', sheetKind = '3v';
+function openSheet(kind) {
+  sheetKind = kind; const box = document.getElementById('sheetBox');
+  document.getElementById('sh3v').setAttribute('aria-pressed', String(kind === '3v'));
+  document.getElementById('shTop').setAttribute('aria-pressed', String(kind === 'top'));
+  document.getElementById('sheetNote').textContent = '出圖中…'; box.hidden = false;
+  setTimeout(() => {
+    const t0 = performance.now();
+    try { sheetName = (kind === '3v' ? drawThreeView() : drawInternalTop()) || ''; }
+    catch (e) { console.error(e); sheetName = ''; }
+    document.getElementById('sheetNote').textContent = sheetName ? `依目前 3D 畫面狀態出圖（${((performance.now() - t0) / 1000).toFixed(1)} 秒）；改完滑桿再按一次就會更新` : '出圖失敗：畫面上沒有可見零件';
+  }, 30);
+}
+document.getElementById('b3v').onclick = () => openSheet('3v');
+document.getElementById('bTop2d').onclick = () => openSheet('top');
+document.getElementById('sh3v').onclick = () => openSheet('3v');
+document.getElementById('shTop').onclick = () => openSheet('top');
+document.getElementById('shClose').onclick = () => { document.getElementById('sheetBox').hidden = true; };
+addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('sheetBox').hidden = true; });
+document.getElementById('shPng').onclick = () => {
+  if (!sheetName) return; const a = document.createElement('a');
+  a.download = `${sheetName}_${stamp().replace(/[-: ]/g, '').slice(0, 12)}.png`; a.href = document.getElementById('sheet').toDataURL('image/png'); a.click();
+};
+window.V = { THREE, meshes, camera, controls, plane, box, center, size, applyCut, renderer, scene, openSheet };
+document.getElementById('msg').remove();
+(function loop() { requestAnimationFrame(loop); renderer.render(scene, camera); })();
+</script>
+<a href="../../" style="position:fixed;right:12px;bottom:12px;z-index:30;background:rgba(5,11,22,.88);border:1px solid #3987e5;border-radius:999px;padding:5px 12px;color:#eaf2ff;font:13px system-ui,sans-serif;text-decoration:none">← 回戰情中心 <span style="color:#fab219">· 示範</span></a>
+</body>
+</html>
